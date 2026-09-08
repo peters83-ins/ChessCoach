@@ -48,8 +48,10 @@ No Stockfish binaries or credentials are committed.
   geometric attacks, including pinned pieces, not guaranteed legal/winning captures.
   En passant is not shown because its destination is empty.
 - Stockfish supplies a current-position evaluation from White's perspective and a
-  best move. Positive scores favor White; signed mate scores identify the winning
-  side. Analysis is full-strength; opponent moves use the selected difficulty.
+  best move. The vertical bar beside the board expands the winning color toward
+  its opponent and flips with the board orientation. Positive scores favor White;
+  signed mate scores identify the winning side. Analysis is full-strength; opponent
+  moves use the selected difficulty.
 - Beginner practice tiers are labelled approximately **800, 1000, and 1200**.
   They deliberately sample weaker Stockfish-ranked legal moves, allowing more
   errors at easier levels. They are **uncalibrated practice settings**, not native
@@ -154,6 +156,7 @@ src/chesscoach/
     main_window.py        Match flow and controls
     match_setup.py        Color, difficulty, executable selection
     chess_board.py        Board and orientation
+    evaluation_bar.py     Graphical White/Black engine evaluation
     game_review.py        Saved-game navigation and engine comparison
     piece_assets.py       Cached SVG piece rendering
     attack_overlay.py     Toggleable, mouse-transparent arrows

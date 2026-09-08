@@ -26,6 +26,7 @@ from chesscoach.engine.worker import EngineRunner, SearchResult
 from chesscoach.storage.database import GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
+from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.game_review import GameReview
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import MoveHistory
@@ -68,8 +69,15 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
+        board_area = QWidget()
+        board_layout = QHBoxLayout(board_area)
+        board_layout.setContentsMargins(0, 0, 0, 0)
+        board_layout.setSpacing(5)
+        self.evaluation_bar = EvaluationBar()
+        board_layout.addWidget(self.evaluation_bar)
         self.board = ChessBoard(self.game)
-        layout.addWidget(self.board, 3)
+        board_layout.addWidget(self.board, 1)
+        layout.addWidget(board_area, 3)
         sidebar = QVBoxLayout()
         layout.addLayout(sidebar, 1)
         title = QLabel("Chess Coach")
@@ -190,6 +198,7 @@ class MainWindow(QMainWindow):
         self.review_timer.stop()
         self.review_panel.hide()
         self.board.set_review_moves(None, None)
+        self.evaluation_bar.clear()
         self.engine_path = path
         self.match = (
             BotMatch(
@@ -201,6 +210,7 @@ class MainWindow(QMainWindow):
             else None
         )
         self.board.set_orientation(self.match.player_color if self.match else chess.WHITE)
+        self.evaluation_bar.set_orientation(self.match.player_color if self.match else chess.WHITE)
         self.setup.setEnabled(False)
         self.statusBar().clearMessage()
         self.engine_label.clear()
@@ -214,6 +224,8 @@ class MainWindow(QMainWindow):
         if self.game.status().game_over:
             self.runner.cancel()
             self.engine_label.clear()
+            outcome = self.game.position.outcome()
+            self.evaluation_bar.set_result(outcome.winner if outcome else None)
             self.save_match()
         else:
             self.request_engine()
@@ -222,6 +234,7 @@ class MainWindow(QMainWindow):
         if self.match is None or not self.active or self.game.status().game_over:
             return
         self.engine_failed = False
+        self.evaluation_bar.clear()
         self.engine_label.setText("Stockfish is thinking…")
         self.runner.search(
             self.game.position,
@@ -250,6 +263,7 @@ class MainWindow(QMainWindow):
             return
         candidate = result.analysis.candidates[0]
         score = candidate.score.white()
+        self.evaluation_bar.set_score(candidate.score)
         mate = score.mate()
         evaluation = f"Mate {mate:+d}" if mate is not None else f"{(score.score() or 0) / 100:+.2f}"
         best = (
@@ -268,6 +282,7 @@ class MainWindow(QMainWindow):
     def engine_error(self, message: str) -> None:
         self.engine_failed = True
         self.engine_label.setText(message)
+        self.evaluation_bar.clear()
         if self.review is not None:
             self.review_panel.best_label.setText("Engine best: Analysis failed")
             self.review_panel.evaluation_label.setText("Evaluation before move: —")
@@ -330,6 +345,7 @@ class MainWindow(QMainWindow):
         )
         self.setup.setEnabled(False)
         self.board.set_orientation(data.player_color == "white")
+        self.evaluation_bar.set_orientation(data.player_color == "white")
         self.review_panel.show()
         self.review_panel.configure(review.total)
         self.set_review_index(review.total)
@@ -353,6 +369,7 @@ class MainWindow(QMainWindow):
             else "—"
         )
         self.board.set_review_moves(move, None)
+        self.evaluation_bar.clear()
         self.review_panel.set_details(played_text, "—", "—")
         self.engine_label.clear()
         self.refresh()
@@ -396,6 +413,7 @@ class MainWindow(QMainWindow):
         )
         self.review_panel.set_details(played_text, best_san, evaluation)
         self.board.set_review_moves(played[0], analysis.best_move)
+        self.evaluation_bar.set_score(candidate.score)
         self.engine_label.setText("Blue: played move · Purple: engine best")
 
     def new_game(self) -> None:
@@ -410,6 +428,7 @@ class MainWindow(QMainWindow):
         self.review_timer.stop()
         self.review_panel.hide()
         self.board.set_review_moves(None, None)
+        self.evaluation_bar.clear()
         self.setup.setEnabled(True)
         self.setup.update_mode()
         self.engine_label.clear()
