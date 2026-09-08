@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+from collections.abc import Sequence
 
 import chess
 import chess.engine
@@ -31,6 +32,10 @@ class Stockfish:
         else:
             self._engine = chess.engine.SimpleEngine.popen_uci(path, timeout=3.0)
 
+    @property
+    def signature(self) -> str:
+        return str(self._engine.id.get("name", "Stockfish"))
+
     def configure_difficulty(self, elo: int) -> int:
         """Return the practice label, or the native target clamped to the UCI range."""
         option = self._engine.options.get("UCI_Elo")
@@ -58,7 +63,13 @@ class Stockfish:
         return result.move
 
     def analyze(
-        self, position: chess.Board, *, limit: chess.engine.Limit, multipv: int = 1
+        self,
+        position: chess.Board,
+        *,
+        limit: chess.engine.Limit,
+        multipv: int = 1,
+        root_moves: Sequence[chess.Move] | None = None,
+        pv_plies: int | None = None,
     ) -> PositionAnalysis:
         if not position.is_valid():
             raise ValueError("Cannot analyze an invalid position.")
@@ -66,7 +77,11 @@ class Stockfish:
             raise ValueError("MultiPV must be positive.")
         # Analysis uses full strength even when the opponent is strength-limited.
         information = self._engine.analyse(
-            position, limit, multipv=multipv, options={"UCI_LimitStrength": False}
+            position,
+            limit,
+            multipv=multipv,
+            root_moves=root_moves,
+            options={"UCI_LimitStrength": False},
         )
         candidates = []
         for info in information:
@@ -74,6 +89,8 @@ class Stockfish:
             if score is None:
                 raise ValueError("Stockfish returned no evaluation.")
             moves = tuple(info.get("pv", []))
+            if pv_plies is not None:
+                moves = moves[:pv_plies]
             board = position.copy()
             for move in moves:
                 if move not in board.legal_moves:
