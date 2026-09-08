@@ -50,6 +50,17 @@ def test_save_full_game_and_retry_without_duplicates(tmp_path: Path) -> None:
     assert [move[5] for move in moves] == restored["move_timestamps"]
     assert moves[0][3] == restored["fens"][0]
     assert moves[-1][4] == restored["fens"][-1]
+    summaries = database.list_games()
+    assert len(summaries) == 1
+    assert summaries[0].id == "match-1"
+    assert summaries[0].move_count == 4
+    loaded = database.load_game("match-1")
+    assert loaded == data
+    assert database.load_game("missing") is None
+
+    legacy_reader = GameDatabase(tmp_path / "new" / "games.sqlite3", legacy_path=path)
+    assert legacy_reader.list_games() == summaries
+    assert legacy_reader.load_game("match-1") == data
 
 
 def test_missing_move_timestamps_rejected() -> None:

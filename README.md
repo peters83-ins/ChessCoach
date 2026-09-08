@@ -89,7 +89,14 @@ block reset/close so you can retry. There is no crash-recovery autosave per move
 
 SQLite lives in a `games` folder under Qt's per-user local application-data
 directory as `games/games.sqlite3`. The folder is created automatically before
-the database is opened.
+the database is opened. On this Windows account, the default location is:
+
+```text
+C:\Users\jadon\AppData\Local\Chess Coach\games\games.sqlite3
+```
+
+The application displays the active path below move history so it can be selected
+and copied.
 The Save Match tooltip and save confirmation show the exact path. Local two-player
 games are not stored automatically; use Copy PGN for those.
 
@@ -104,9 +111,12 @@ The Python persistence API is `GameDatabase(path).save_game(game_data)`, accepti
 validated `GameData`; it returns a `SaveResult` with a `success` boolean and a short
 error on failure. Validation requires moves, matching timestamps, player color,
 and positive bot difficulty. `BotMatch.save(database)` builds the record.
-There is no saved-game browser or resume UI yet. Domain PGN parsing loads the first
-standard mainline; comments, variations, headers, and recorded resignations/agreed
-draws are not retained.
+Use **Load Saved Game** to choose a match by date, player color, bot difficulty,
+result, and move count. Loading restores the full board and SAN history in a
+read-only analysis view; legal destinations and attack visualization remain
+available. **New Game** exits that view. Domain PGN parsing loads the first standard
+mainline; comments, variations, headers, and recorded resignations/agreed draws are
+not retained. Databases from the previous parent-folder location are also listed.
 
 ## Development
 

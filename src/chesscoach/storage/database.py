@@ -99,9 +99,62 @@ class SaveResult:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class SavedGameSummary:
+    id: str
+    saved_at: str
+    player_color: str
+    bot_elo: int
+    result: str
+    move_count: int
+
+
 class GameDatabase:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, legacy_path: Path | None = None) -> None:
         self.path = path
+        self.legacy_path = legacy_path
+
+    def _read_paths(self) -> tuple[Path, ...]:
+        paths = [self.path]
+        if self.legacy_path is not None and self.legacy_path != self.path:
+            paths.append(self.legacy_path)
+        return tuple(path for path in paths if path.is_file())
+
+    @staticmethod
+    def _decode(data_json: str) -> GameData:
+        data = json.loads(data_json)
+        for field_name in ("moves", "san", "fens", "move_timestamps"):
+            data[field_name] = tuple(data[field_name])
+        game_data = GameData(**data)
+        game_data.validate()
+        return game_data
+
+    def list_games(self) -> tuple[SavedGameSummary, ...]:
+        """List newest unique saves from current and legacy database locations."""
+        games: dict[str, SavedGameSummary] = {}
+        for path in reversed(self._read_paths()):
+            with closing(sqlite3.connect(path, timeout=2.0)) as connection:
+                rows = connection.execute(
+                    "SELECT id, saved_at, player_color, bot_elo, result, data_json "
+                    "FROM games ORDER BY saved_at DESC"
+                ).fetchall()
+            for game_id, saved_at, color, elo, result, data_json in rows:
+                data = self._decode(data_json)
+                games[game_id] = SavedGameSummary(
+                    game_id, saved_at, color, elo, result, len(data.moves)
+                )
+        return tuple(sorted(games.values(), key=lambda game: game.saved_at, reverse=True))
+
+    def load_game(self, game_id: str) -> GameData | None:
+        """Load and validate one record, preferring current storage."""
+        for path in self._read_paths():
+            with closing(sqlite3.connect(path, timeout=2.0)) as connection:
+                row = connection.execute(
+                    "SELECT data_json FROM games WHERE id = ?", (game_id,)
+                ).fetchone()
+            if row is not None:
+                return self._decode(row[0])
+        return None
 
     def save_game(self, game_data: GameData) -> SaveResult:
         """Insert/update one match atomically; repeated Save clicks never duplicate it."""
