@@ -1,13 +1,15 @@
 """Match setup, human/engine turns, and explicit persistence feedback."""
 
+import sqlite3
 from pathlib import Path
 
 import chess
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QStandardPaths, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QDialog,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -24,6 +26,7 @@ from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import MoveHistory
+from chesscoach.ui.saved_games import SavedGamesDialog
 
 
 class MainWindow(QMainWindow):
@@ -40,14 +43,16 @@ class MainWindow(QMainWindow):
         self.match: BotMatch | None = None
         self.engine_path = ""
         self.engine_failed = False
+        self.review_details = ""
         self.runner = runner if runner is not None else EngineRunner(self)
         self.runner.result.connect(self.engine_result)
         self.runner.error.connect(self.engine_error)
         data_dir = Path(
             QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
         )
-        self.database = (
-            database if database is not None else GameDatabase(data_dir / "games" / "games.sqlite3")
+        self.database = database or GameDatabase(
+            data_dir / "games" / "games.sqlite3",
+            legacy_path=data_dir / "games.sqlite3",
         )
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
@@ -81,12 +86,17 @@ class MainWindow(QMainWindow):
         sidebar.addWidget(self.engine_label)
         self.history = MoveHistory()
         sidebar.addWidget(self.history, 1)
+        self.storage_label = QLabel(f"Saved games: {self.database.path}")
+        self.storage_label.setWordWrap(True)
+        self.storage_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        sidebar.addWidget(self.storage_label)
         self.new_game_button = QPushButton("New Game")
         self.undo_button = QPushButton("Undo")
         self.claim_draw_button = QPushButton("Claim Draw")
         self.copy_pgn_button = QPushButton("Copy PGN")
         self.save_button = QPushButton("Save Match")
         self.save_button.setToolTip(str(self.database.path))
+        self.load_button = QPushButton("Load Saved Game")
         self.retry_button = QPushButton("Retry Engine")
         for button in (
             self.new_game_button,
@@ -94,6 +104,7 @@ class MainWindow(QMainWindow):
             self.claim_draw_button,
             self.copy_pgn_button,
             self.save_button,
+            self.load_button,
             self.retry_button,
         ):
             sidebar.addWidget(button)
@@ -102,6 +113,7 @@ class MainWindow(QMainWindow):
         self.claim_draw_button.clicked.connect(self.claim_draw)
         self.copy_pgn_button.clicked.connect(self.copy_pgn)
         self.save_button.clicked.connect(self.save_match)
+        self.load_button.clicked.connect(self.load_saved_game)
         self.retry_button.clicked.connect(self.request_engine)
         self.board.game_changed.connect(self.position_changed)
         self.board.message.connect(self.show_board_message)
@@ -109,13 +121,17 @@ class MainWindow(QMainWindow):
 
     def show_board_message(self, message: str) -> None:
         self.statusBar().showMessage(message)
-        if not self.active:
+        if not self.active and not self.review_details:
             self.status_label.setText(message)
 
     def refresh(self) -> None:
         status = self.game.status()
         self.status_label.setText(
-            status.message if self.active else "Choose color and difficulty, then Start Match."
+            self.review_details
+            if self.review_details
+            else status.message
+            if self.active
+            else "Choose color and difficulty, then Start Match."
         )
         self.history.set_moves(self.game.history())
         human_turn = self.match is None or self.game.turn == self.match.player_color
@@ -134,6 +150,7 @@ class MainWindow(QMainWindow):
         self.undo_button.setEnabled(self.active and can_undo)
         self.claim_draw_button.setEnabled(self.active and human_turn and status.can_claim_draw)
         self.save_button.setEnabled(self.match is not None and bool(self.game.history()))
+        self.load_button.setEnabled(not self.active)
         self.retry_button.setEnabled(
             self.match is not None and self.engine_failed and not status.game_over
         )
@@ -153,6 +170,7 @@ class MainWindow(QMainWindow):
         self.game.reset()
         self.active = True
         self.engine_failed = False
+        self.review_details = ""
         self.engine_path = path
         self.match = (
             BotMatch(
@@ -237,12 +255,58 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Game saved.")
         return True
 
+    def load_saved_game(self) -> None:
+        if not self.save_match():
+            return
+        try:
+            games = self.database.list_games()
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Load failed: {error}")
+            return
+        if not games:
+            self.statusBar().showMessage(f"No saved games found in {self.database.path.parent}")
+            return
+        dialog = SavedGamesDialog(games, str(self.database.path), self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        game_id = dialog.selected_game_id()
+        if game_id is None:
+            return
+        try:
+            data = self.database.load_game(game_id)
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Load failed: {error}")
+            return
+        if data is None:
+            self.statusBar().showMessage("Load failed: game no longer exists.")
+            return
+        game = Game(data.fens[0])
+        for uci in data.moves:
+            if not game.attempt_move(chess.Move.from_uci(uci)):
+                self.statusBar().showMessage("Load failed: invalid move history.")
+                return
+        self.runner.cancel()
+        self.game = game
+        self.board.game = game
+        self.match = None
+        self.active = False
+        self.review_details = (
+            f"Saved game for analysis · Player {data.player_color.title()} · "
+            f"Bot {data.bot_elo} · Result {data.result}"
+        )
+        self.setup.setEnabled(False)
+        self.board.set_orientation(data.player_color == "white")
+        self.engine_label.clear()
+        self.statusBar().showMessage("Saved game loaded.")
+        self.refresh()
+
     def new_game(self) -> None:
         if not self.save_match():
             return
         self.runner.cancel()
         self.match = None
         self.active = False
+        self.review_details = ""
         self.setup.setEnabled(True)
         self.setup.update_mode()
         self.engine_label.clear()

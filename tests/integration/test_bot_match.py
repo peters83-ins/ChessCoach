@@ -6,13 +6,14 @@ from pathlib import Path
 import chess
 import chess.engine
 import pytest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog
 
 from chesscoach.chess.pgn import parse_pgn
 from chesscoach.engine.analysis import CandidateLine, PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
 from chesscoach.storage.database import GameDatabase
 from chesscoach.ui.main_window import MainWindow
+from chesscoach.ui.saved_games import SavedGamesDialog
 
 
 class FakeRunner(EngineRunner):
@@ -172,3 +173,35 @@ def test_missing_engine_and_local_mode(bot: tuple[MainWindow, FakeRunner]) -> No
     human_move(window, "e7", "e5")
     assert len(window.game.history()) == 2
     assert window.match is None
+
+
+def test_load_saved_game_for_analysis(
+    bot: tuple[MainWindow, FakeRunner], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    window, runner = bot
+    assert str(window.database.path) in window.storage_label.text()
+    window.start_match()
+    human_move(window, "e2", "e4")
+    runner.respond("e7e5")
+    assert window.match is not None
+    game_id = window.match.id
+    assert window.save_match()
+    window.new_game()
+    monkeypatch.setattr(SavedGamesDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+    monkeypatch.setattr(SavedGamesDialog, "selected_game_id", lambda self: game_id)
+    window.load_button.click()
+    assert [move.san for move in window.game.history()] == ["e4", "e5"]
+    assert window.review_details.startswith("Saved game for analysis")
+    assert window.match is None
+    assert not window.active
+    assert not window.setup.isEnabled()
+    assert window.board.preview_only
+    assert window.statusBar().currentMessage() == "Saved game loaded."
+    window.new_game()
+    assert window.setup.isEnabled()
+
+
+def test_load_button_reports_empty_database(bot: tuple[MainWindow, FakeRunner]) -> None:
+    window, _ = bot
+    window.load_button.click()
+    assert window.statusBar().currentMessage().startswith("No saved games found in")
