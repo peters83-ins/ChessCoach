@@ -1,62 +1,85 @@
 # Chess Coach
 
-A Python 3.12+ desktop chess trainer. This first milestone is a local two-player
-chessboard: both players use the same computer. It runs without an OpenAI API key,
-Stockfish, an internet connection, or a database after dependencies are installed.
+Python 3.12+ / PySide6 desktop chess with local Stockfish play and SQLite match
+saving. No OpenAI credentials or network connection are needed during play.
 
-## Implemented
+## Run on Windows
 
-- Click a piece, then a legal destination; White starts at the bottom.
-- Selected-square and legal-destination highlights, coordinates, Unicode pieces.
-- Legal turns, captures, castling, en passant, and promotion to any of four pieces.
-- Turn/check status, checkmate, stalemate, and automatic draws from python-chess.
-- SAN move history, New Game, and Undo (one player's move at a time).
-- Claim Draw for claimable repetition/fifty-move draws, including claims available
-  by announcing a legal next move as determined by python-chess. These are never
-  claimed automatically. Undo after a claim first withdraws the claim.
-- Copy PGN to the clipboard; domain-level PGN parsing and export with FEN starts.
-- Unit tests, headless Qt interaction tests, linting, formatting, and type checking.
-
-New Game immediately resets the board. Games are held in memory; use Copy PGN
-before starting another game or closing the window if you want to keep one.
-The promotion dialog can be cancelled without moving the pawn.
-
-PGN parsing loads the first standard game's mainline. Comments, variations,
-original headers, and recorded resignations/agreed draws are not retained.
-The parser reconstructs a playable board and derives its result from that board.
-There is no PGN import/browser UI yet.
-
-## Windows setup and launch
-
-Install Python 3.12 or newer with the Windows Python launcher. In PowerShell,
-open the repository directory. Create the environment only if it does not exist:
-
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python --version
-python -m pip install -r requirements.txt
-python -m chesscoach.main
-```
-
-Confirm that `python --version` reports 3.12 or newer. `requirements.txt` installs
-the editable application and development tools defined in `pyproject.toml`.
-If activation is unavailable, run the interpreter directly:
+From the repository directory in PowerShell, use the existing virtual environment:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m chesscoach.main
 ```
 
-An activated environment also provides the `chesscoach` launcher. On Linux, create
-a separate environment with `python3 -m venv .venv`, activate it with
-`source .venv/bin/activate`, then use the same install/run commands. Windows and
-Linux environments cannot be shared. Linux GUI use requires the Qt system
-libraries and a working display; headless tests use Qt's offscreen platform.
+If `.venv` does not exist, create it first with `py -3 -m venv .venv` using Python
+3.12 or newer. Optional activation: `.\.venv\Scripts\Activate.ps1`. Once activated,
+`python -m chesscoach.main` also launches the app.
 
-## Development checks
+Install a compatible local Stockfish executable separately, outside the repository.
+In the app, choose **White or Black**, choose a difficulty, **Browse** to the
+executable, then **Start Match**. Selecting Black flips the board and Stockfish
+plays first. Alternatively, choose **Local two-player** without an engine.
 
-From the repository root with the environment active:
+To prefill the engine path, set `STOCKFISH_PATH` in your environment or local `.env`.
+You can copy `.env.example` to `.env`; environment variables take precedence.
+`.env`, virtual environments, databases, and generated output remain ignored.
+No Stockfish binaries or credentials are committed.
+
+## Gameplay
+
+- Filled white/black SVG pieces, square selection, legal destination highlights,
+  and SAN move history. Click a piece, then its destination.
+- Castling, en passant, captures, all four promotions, check, checkmate, stalemate,
+  and automatic draws are handled by python-chess.
+- **Show attacks on enemy pieces** toggles red arrows for both sides. These are
+  geometric attacks, including pinned pieces, not guaranteed legal/winning captures.
+  En passant is not shown because its destination is empty.
+- Stockfish supplies a current-position evaluation from White's perspective and a
+  best move. Positive scores favor White; signed mate scores identify the winning
+  side. Analysis is full-strength; opponent moves use the selected difficulty.
+- Bot tiers target approximately 1400, 1800, or 2200 Elo. Targets are clamped to the
+  installed engine's advertised range; the actual target is displayed and saved.
+  These are approximate engine settings, not guaranteed human ratings. See the
+  [Stockfish difficulty documentation](https://official-stockfish.github.io/docs/stockfish-wiki/Stockfish-FAQ.html#how-do-skill-level-and-uci_elo-work).
+- Engine work runs in background threads. Human input is blocked on the bot's turn;
+  changing games, undoing, or closing cancels searches and rejects stale results.
+- **Undo** takes back to your previous decision in a bot match, or one ply in local
+  mode. Completed bot matches cannot be undone. **New Game** returns to setup.
+- **Claim Draw** enables python-chess repetition/fifty-move claims on your turn,
+  including claims available through a legal next move. Automatic draws need no claim.
+- Engine errors appear in the panel. Use **Retry Engine**, or **New Game** to change
+  the executable. A missing engine never silently switches to a different opponent.
+- **Copy PGN** exports the current game to the clipboard.
+
+Searches use 0.2 seconds for evaluation and 0.3 seconds for opponent moves, plus
+startup overhead. These short searches provide practical estimates, not exhaustive
+analysis. Difficulty limiting may intentionally choose a weaker move than the
+full-strength analysis recommendation.
+
+## Saved games
+
+Completed human-versus-bot matches save automatically. **Save Match** also saves
+unfinished games and retries failed saves. New Game and normal window close save
+an unfinished bot match before leaving it. Failed saves preserve the board and
+block reset/close so you can retry. There is no crash-recovery autosave per move.
+
+SQLite lives in Qt's per-user local application-data directory as `games.sqlite3`.
+The Save Match tooltip and save confirmation show the exact path. Local two-player
+games are not stored automatically; use Copy PGN for those.
+
+Each record contains a match UUID, player color, actual bot Elo, result, full PGN,
+UCI and SAN move lists, the initial FEN plus a FEN after every ply, UTC move
+timestamps, and start/save/end timestamps. Unfinished matches have result `*` and
+no end timestamp. Repeated saves update the same record transactionally.
+
+The Python persistence API is `GameDatabase(path).save_game(game_data)`, accepting
+`GameData`; `BotMatch.save(database)` builds that record from a game and its metadata.
+There is no saved-game browser or resume UI yet. Domain PGN parsing loads the first
+standard mainline; comments, variations, headers, and recorded resignations/agreed
+draws are not retained.
+
+## Development
 
 ```powershell
 python -m pytest
@@ -66,87 +89,40 @@ python -m ruff format --check .
 python -m mypy src/chesscoach
 ```
 
-To apply formatting, run `python -m ruff format .`. Integration tests instantiate
-real Qt widgets, simulate clicks, and briefly run the event loop without opening
-a visible window. No engine process or API requests are required.
+The suite uses real offscreen Qt widgets and deterministic engine doubles. To also
+run real Stockfish process/GUI tests, set `CHESSCOACH_TEST_STOCKFISH` to your local
+executable before running pytest. Those tests skip when the variable is unset.
 
-In VS Code, select `.venv\Scripts\python.exe` with **Python: Select Interpreter**,
-and configure pytest discovery in `tests`. Launch/debug the module
-`chesscoach.main`; debug tests with the Python Testing panel. Local `.vscode`
-settings and launch configurations are provided in this working copy but remain
-ignored by Git under the existing policy. Other clones can use these same manual
-steps. Exceptions remain visible in the terminal/debugger.
-
-## Structure and boundaries
+Linux development requires a separate Linux virtual environment and Qt system
+libraries; do not reuse a Windows `.venv`. VS Code: select the project's Python
+interpreter and discover pytest in `tests`. Ignored local `.vscode` settings include
+application and pytest launch configurations.
 
 ```text
-pyproject.toml                 Dependencies, packaging, pytest, Ruff, mypy
-requirements.txt              Editable install with development tools
-.env.example                  Empty optional-service settings
 src/chesscoach/
-  main.py                     Application entry point
-  config.py                   Explicit environment/.env configuration
-  chess/
-    game.py                   GUI-independent game model and status
-    pgn.py                    PGN text interchange
+  main.py, config.py       Launch and environment configuration
+  chess/                  Game rules, PGN, geometric attack queries
+  engine/
+    analysis.py           Evaluation and candidate-line contracts
+    stockfish.py          Local UCI adapter and difficulty control
+    worker.py             Cancellable background searches
   ui/
-    chess_board.py            Board selection and promotion UI
-    move_history.py           SAN table
-    main_window.py            Game controls and presentation
-  engine/analysis.py          Typed future engine service/results contract
-  ai/client.py                Lazy OpenAI SDK factory; no requests
-tests/
-  unit/                       Rules, PGN, configuration, analysis results
-  integration/                Offscreen desktop interaction and launch tests
+    main_window.py        Match flow and controls
+    match_setup.py        Color, difficulty, executable selection
+    chess_board.py        Board and orientation
+    piece_assets.py       Cached SVG piece rendering
+    attack_overlay.py     Toggleable, mouse-transparent arrows
+    move_history.py       SAN table
+  storage/
+    database.py           GameData and transactional save_game API
+    match.py              Match identity and timestamps
+  ai/client.py            Future OpenAI client factory; no requests
+tests/unit/              Chess, attack, engine, configuration, storage tests
+tests/integration/       GUI flows, workers, optional real Stockfish tests
 ```
 
-Each package also has an `__init__.py`. python-chess is authoritative for moves,
-board state, and results. Future Stockfish analysis will supply scores, best moves,
-and principal variations; future LLM coaching will explain that validated data.
-The LLM must never establish legality, evaluations, mate, or tactical correctness.
-
-`EngineService` accepts board snapshots (including history), depth/time limits via
-`chess.engine.Limit`, and MultiPV. A future adapter will use `STOCKFISH_PATH` and run
-away from the GUI thread. No adapter, analysis execution, computer opponent,
-Stockfish download, or Stockfish binary is included in this milestone.
-
-## Optional OpenAI configuration
-
-**You do not need to set up credentials for this milestone.** The app never
-constructs an OpenAI client or sends a request on startup or during local play.
-AI explanations are planned, so adding a key now does not enable a coach UI.
-
-When implementing coaching, create an API key through the OpenAI developer
-platform and configure `OPENAI_API_KEY` locally, following the
-[official OpenAI quickstart](https://developers.openai.com/api/docs/quickstart).
-Choose the model centrally using `OPENAI_MODEL`; no model is hard-coded here.
-Do not paste credentials into source code or commit them.
-
-The optional example contains empty values only:
-
-```dotenv
-OPENAI_API_KEY=
-OPENAI_MODEL=
-STOCKFISH_PATH=
-```
-
-You may later copy `.env.example` to `.env` and fill it in locally. `.env` and
-`.env.*` remain ignored; only the reviewed empty `.env.example` is tracked.
-The factory takes `Settings.from_environment()`. Explicitly passing
-`Settings.from_environment(Path(".env"))` loads that file without overriding
-existing environment variables. Local chess does not read it at startup.
-Calling the future-service factory without a key or model raises a clear
-`ConfigurationError`; a future coach UI should display that message.
-
-## Next milestone
-
-Implement a configurable local Stockfish adapter and an asynchronous analysis
-panel showing White-perspective evaluation, best move, and MultiPV lines for the
-current position. Add adapter tests, subprocess cleanup, cancellation, and stale
-result protection while keeping local chess usable when Stockfish is absent.
-
-After that: whole-game review with transparent mistake thresholds, SQLite game
-and analysis persistence, engine-grounded AI explanations, then recurring-mistake
-tracking and personalized lessons/puzzles. Storage and learning modules are
-intentionally deferred until their behavior is needed. No SQLite files are
-created by this milestone.
+python-chess and Stockfish are authoritative for chess mechanics and analysis.
+OpenAI coaching, game review, lessons, and a saved-game browser remain unimplemented.
+No API key is needed for the implemented features. Piece artwork attribution is in
+[THIRD_PARTY.md](THIRD_PARTY.md); SVGs are rendered from the existing python-chess
+dependency, not downloaded separately.

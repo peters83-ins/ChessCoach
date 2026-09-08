@@ -14,7 +14,7 @@ from chesscoach.ui.main_window import MainWindow
 
 @pytest.fixture
 def window(app: QApplication) -> Iterator[MainWindow]:
-    widget = MainWindow()
+    widget = MainWindow(Game())
     widget.show()
     app.processEvents()
     yield widget
