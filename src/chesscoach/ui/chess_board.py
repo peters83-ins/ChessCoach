@@ -29,6 +29,8 @@ class ChessBoard(QWidget):
         self.input_allowed = True
         self.preview_only = False
         self.input_message = "Wait for the computer to move."
+        self.played_highlight: chess.Move | None = None
+        self.best_highlight: chess.Move | None = None
         self.squares: dict[chess.Square, QPushButton] = {}
         layout = QGridLayout(self)
         self.board_layout = layout
@@ -87,6 +89,11 @@ class ChessBoard(QWidget):
         self.selected_square = None
         self.refresh()
 
+    def set_review_moves(self, played: chess.Move | None, best: chess.Move | None) -> None:
+        self.played_highlight = played
+        self.best_highlight = best
+        self.refresh()
+
     def refresh(self) -> None:
         destinations = (
             {m.to_square for m in self.game.legal_moves_from(self.selected_square)}
@@ -107,8 +114,18 @@ class ChessBoard(QWidget):
             light = (chess.square_file(square) + chess.square_rank(square)) % 2 == 1
             background = "#f0d9b5" if light else "#b58863"
             border = "transparent"
+            if self.played_highlight and square in (
+                self.played_highlight.from_square,
+                self.played_highlight.to_square,
+            ):
+                background = "#72a7d8"
             if square == self.selected_square:
                 background, border = "#f6dd65", "#806500"
+            elif self.best_highlight and square in (
+                self.best_highlight.from_square,
+                self.best_highlight.to_square,
+            ):
+                border = "#9b35ad"
             elif square in destinations:
                 border = "#246b45"
             button.setStyleSheet(

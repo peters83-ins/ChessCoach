@@ -52,6 +52,12 @@ class Game:
     def can_undo(self) -> bool:
         return bool(self._board.move_stack) or self._claimed_draw
 
+    def copy(self) -> "Game":
+        clone = object.__new__(Game)
+        clone._board = self._board.copy()
+        clone._claimed_draw = self._claimed_draw
+        return clone
+
     def piece_at(self, square: chess.Square) -> chess.Piece | None:
         return self._board.piece_at(square)
 

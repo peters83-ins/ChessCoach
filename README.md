@@ -112,11 +112,14 @@ validated `GameData`; it returns a `SaveResult` with a `success` boolean and a s
 error on failure. Validation requires moves, matching timestamps, player color,
 and positive bot difficulty. `BotMatch.save(database)` builds the record.
 Use **Load Saved Game** to choose a match by date, player color, bot difficulty,
-result, and move count. Loading restores the full board and SAN history in a
-read-only analysis view; legal destinations and attack visualization remain
-available. **New Game** exits that view. Domain PGN parsing loads the first standard
-mainline; comments, variations, headers, and recorded resignations/agreed draws are
-not retained. Databases from the previous parent-folder location are also listed.
+result, and move count. Loading opens a read-only analysis view at the final move.
+Use the first, previous, next, last, and slider controls to visit any ply. The board
+shows the selected position, with the played move in blue and Stockfish's best move
+in purple. The details panel shows both moves in SAN and the evaluation before the
+played move. Results are cached by position while the game remains open. **New Game**
+exits that view. Domain PGN parsing loads the first standard mainline; comments,
+variations, headers, and recorded resignations/agreed draws are not retained.
+Databases from the previous parent-folder location are also listed.
 
 ## Development
 
@@ -151,6 +154,7 @@ src/chesscoach/
     main_window.py        Match flow and controls
     match_setup.py        Color, difficulty, executable selection
     chess_board.py        Board and orientation
+    game_review.py        Saved-game navigation and engine comparison
     piece_assets.py       Cached SVG piece rendering
     attack_overlay.py     Toggleable, mouse-transparent arrows
     move_history.py       SAN table
@@ -163,7 +167,7 @@ tests/integration/       GUI flows, workers, optional real Stockfish tests
 ```
 
 python-chess and Stockfish are authoritative for chess mechanics and analysis.
-OpenAI coaching, game review, lessons, and a saved-game browser remain unimplemented.
+OpenAI coaching and lessons remain unimplemented.
 No API key is needed for the implemented features. Piece artwork attribution is in
 [THIRD_PARTY.md](THIRD_PARTY.md); SVGs are rendered from the existing python-chess
 dependency, not downloaded separately.
