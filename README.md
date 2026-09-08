@@ -87,17 +87,23 @@ unfinished games and retries failed saves. New Game and normal window close save
 an unfinished bot match before leaving it. Failed saves preserve the board and
 block reset/close so you can retry. There is no crash-recovery autosave per move.
 
-SQLite lives in Qt's per-user local application-data directory as `games.sqlite3`.
+SQLite lives in a `games` folder under Qt's per-user local application-data
+directory as `games/games.sqlite3`. The folder is created automatically before
+the database is opened.
 The Save Match tooltip and save confirmation show the exact path. Local two-player
 games are not stored automatically; use Copy PGN for those.
 
-Each record contains a match UUID, player color, actual bot Elo, result, full PGN,
-UCI and SAN move lists, the initial FEN plus a FEN after every ply, UTC move
+Each record contains a match UUID, player color, actual bot difficulty, result,
+full PGN, UCI and SAN move lists, the initial FEN plus a FEN after every ply, UTC move
 timestamps, and start/save/end timestamps. Unfinished matches have result `*` and
-no end timestamp. Repeated saves update the same record transactionally.
+no end timestamp. Every ply is also stored as a row in `game_moves`, with UCI,
+SAN, before/after FEN, and timestamp. Repeated saves replace that match's move rows
+transactionally, preserving the complete current history without duplicates.
 
 The Python persistence API is `GameDatabase(path).save_game(game_data)`, accepting
-`GameData`; `BotMatch.save(database)` builds that record from a game and its metadata.
+validated `GameData`; it returns a `SaveResult` with a `success` boolean and a short
+error on failure. Validation requires moves, matching timestamps, player color,
+and positive bot difficulty. `BotMatch.save(database)` builds the record.
 There is no saved-game browser or resume UI yet. Domain PGN parsing loads the first
 standard mainline; comments, variations, headers, and recorded resignations/agreed
 draws are not retained.

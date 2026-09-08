@@ -129,7 +129,7 @@ def test_completed_game_autosave_and_manual_retry(bot: tuple[MainWindow, FakeRun
     human_move(window, "g2", "g4")
     runner.respond("d8h4")
     assert window.game.status().game_over
-    assert "Match saved" in window.statusBar().currentMessage()
+    assert window.statusBar().currentMessage() == "Game saved."
     assert not window.undo_button.isEnabled()
     window.save_button.click()
     with sqlite3.connect(window.database.path) as connection:
@@ -151,7 +151,7 @@ def test_save_failure_preserves_game(bot: tuple[MainWindow, FakeRunner], tmp_pat
     before = window.game.fen
     window.new_game()
     assert window.game.fen == before
-    assert "Could not save" in window.statusBar().currentMessage()
+    assert window.statusBar().currentMessage().startswith("Save failed:")
     assert not window.close()
     window.database = original
     assert window.save_match()
