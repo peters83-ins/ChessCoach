@@ -65,6 +65,7 @@ def test_setup_white_turns_and_undo(bot: tuple[MainWindow, FakeRunner]) -> None:
     assert runner.requests[-1][3] is False
     runner.respond()
     assert "White eval: +0.25" in window.engine_label.text()
+    assert window.evaluation_bar.white_fraction > 0.5
     assert window.match.elo == 1500
     human_move(window, "e2", "e4")
     assert runner.requests[-1][3] is True
@@ -84,6 +85,7 @@ def test_black_gets_engine_opening(bot: tuple[MainWindow, FakeRunner]) -> None:
     window.setup.color.setCurrentIndex(1)
     window.start_match()
     assert window.board.orientation == chess.BLACK
+    assert not window.evaluation_bar.white_at_bottom
     assert not window.board.input_allowed
     assert runner.requests[-1][3]
     runner.respond("e2e4")
@@ -215,6 +217,7 @@ def test_load_saved_game_for_analysis(
     runner.respond()
     assert window.review_panel.best_label.text() != "Engine best: —"
     assert window.review_panel.evaluation_label.text().endswith("+0.25")
+    assert window.evaluation_bar.white_fraction > 0.5
     best = next(iter(runner.requests[-1][0].legal_moves))
     assert "#9b35ad" in window.board.squares[best.from_square].styleSheet()
 
