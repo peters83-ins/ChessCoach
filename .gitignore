@@ -31,3 +31,8 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Additional development output
+*.egg-info/
+.ruff_cache/
+.mypy_cache/
