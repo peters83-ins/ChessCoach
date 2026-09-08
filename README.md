@@ -152,17 +152,20 @@ src/chesscoach/
     practice.py           Approximate beginner move selection
     discovery.py          Per-user engine/PATH discovery
     worker.py             Cancellable background searches
+  coach/                  Analysis, facts, feedback, reports, practice, lessons
   ui/
     main_window.py        Match flow and controls
     match_setup.py        Color, difficulty, executable selection
     chess_board.py        Board and orientation
     evaluation_bar.py     Graphical White/Black engine evaluation
     game_review.py        Saved-game navigation and engine comparison
+    coach_panel.py         Full-game report, feedback, practice, and lessons
     piece_assets.py       Cached SVG piece rendering
     attack_overlay.py     Toggleable, mouse-transparent arrows
     move_history.py       SAN table
   storage/
     database.py           GameData and transactional save_game API
+    coach.py              Versioned coaching persistence and analysis cache
     match.py              Match identity and timestamps
   ai/client.py            Future OpenAI client factory; no requests
 tests/unit/              Chess, attack, engine, configuration, storage tests
@@ -170,7 +173,21 @@ tests/integration/       GUI flows, workers, optional real Stockfish tests
 ```
 
 python-chess and Stockfish are authoritative for chess mechanics and analysis.
-OpenAI coaching and lessons remain unimplemented.
-No API key is needed for the implemented features. Piece artwork attribution is in
+No API key is needed for local coaching or gameplay. Piece artwork attribution is in
 [THIRD_PARTY.md](THIRD_PARTY.md); SVGs are rendered from the existing python-chess
 dependency, not downloaded separately.
+
+## AI coach
+
+Load a saved game and choose **Analyze Full Game**. Chess Coach scans every move,
+deepens critical positions, grades the player's decisions, and shows grounded local
+feedback in the review panel. The report includes project-specific accuracy, phase
+results, turning points, recurring weaknesses, practice positions, and tailored
+lessons. Analysis and feedback are stored in the same SQLite database and reused.
+
+The local coach works without credentials. To improve the wording for critical
+player moves, set both `OPENAI_API_KEY` and `OPENAI_MODEL` in the ignored `.env`.
+Only selected positions, legal moves, engine lines, classifications, and extracted
+evidence are sent; full PGNs and API keys are not stored or transmitted by the
+coaching pipeline. Invalid or unavailable AI output falls back to local feedback.
+See [AI coach architecture](docs/AI_COACH.md) for scoring and extension contracts.

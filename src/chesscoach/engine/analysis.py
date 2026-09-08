@@ -1,5 +1,6 @@
 """Shared result types and interface for local engine analysis."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -36,7 +37,13 @@ class EngineService(Protocol):
     """
 
     def analyze(
-        self, position: chess.Board, *, limit: chess.engine.Limit, multipv: int = 1
+        self,
+        position: chess.Board,
+        *,
+        limit: chess.engine.Limit,
+        multipv: int = 1,
+        root_moves: Sequence[chess.Move] | None = None,
+        pv_plies: int | None = None,
     ) -> PositionAnalysis: ...
 
     def close(self) -> None: ...
