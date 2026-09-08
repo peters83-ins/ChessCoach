@@ -66,6 +66,7 @@ def _move_from_dict(data: dict[str, Any]) -> MoveAnalysis:
         ),
         tags=tuple(str(tag) for tag in data["tags"]),
         deepened=bool(data["deepened"]),
+        alternative_moves=tuple(str(move) for move in data.get("alternative_moves", ())),
     )
 
 
@@ -336,8 +337,7 @@ class CoachRepository:
                 "confidence, "
                 "outcome, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(profile_id, game_id, ply, theme, outcome) DO UPDATE SET "
-                "severity=excluded.severity, confidence=excluded.confidence, "
-                "created_at=excluded.created_at",
+                "severity=excluded.severity, confidence=excluded.confidence",
                 (
                     (
                         event.profile_id,
@@ -347,7 +347,7 @@ class CoachRepository:
                         event.severity,
                         event.confidence,
                         event.outcome,
-                        _now(),
+                        event.observed_at or _now(),
                     )
                     for event in events
                 ),
@@ -378,15 +378,15 @@ class CoachRepository:
         self.migrate()
         with closing(sqlite3.connect(self.path)) as connection:
             rows = connection.execute(
-                "SELECT theme, severity, confidence, outcome FROM weakness_events "
+                "SELECT theme, severity, confidence, outcome, created_at FROM weakness_events "
                 "WHERE profile_id=?",
                 (profile_id,),
             ).fetchall()
         from chesscoach.coach.weakness import aggregate_weaknesses
 
         events = tuple(
-            WeaknessEvent(profile_id, "", 0, theme, severity, confidence, outcome)
-            for theme, severity, confidence, outcome in rows
+            WeaknessEvent(profile_id, "", 0, theme, severity, confidence, outcome, created_at)
+            for theme, severity, confidence, outcome, created_at in rows
         )
         return aggregate_weaknesses(events)
 

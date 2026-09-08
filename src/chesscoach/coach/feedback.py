@@ -115,8 +115,11 @@ class OpenAIProvider:
         except (KeyError, TypeError, ValueError) as error:
             raise FeedbackError("The AI feedback fields are invalid.") from error
         allowed = {fact.id for fact in context.move.evidence}
-        if not set(evidence_ids).issubset(allowed):
+        if not evidence_ids or not set(evidence_ids).issubset(allowed):
             raise FeedbackError("The AI referenced unsupported evidence.")
+        expected_verdict = context.move.classification.value
+        if str(item["verdict"]).strip().lower() != expected_verdict:
+            raise FeedbackError("The AI changed the engine-backed move classification.")
         board = chess.Board(context.move.fen)
         for uci in continuation:
             try:
@@ -126,6 +129,13 @@ class OpenAIProvider:
             if move not in board.legal_moves:
                 raise FeedbackError("The AI returned an illegal continuation.")
             board.push(move)
+        supplied_lines = (context.move.best_pv, context.move.played_pv)
+        if continuation and not any(
+            continuation == line[: len(continuation)] for line in supplied_lines
+        ):
+            raise FeedbackError("The AI returned a continuation not supplied by Stockfish.")
+        if not str(item["explanation"]).strip() or not str(item["takeaway"]).strip():
+            raise FeedbackError("The AI returned empty coaching text.")
         return CoachFeedback(
             context.game_id,
             ply,

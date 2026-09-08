@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from chesscoach.coach.models import MoveAnalysis, MoveClassification, WeaknessEvent, WeaknessScore
 
@@ -21,16 +22,36 @@ def weakness_events(
         if move.mover != player_color or severity is None:
             continue
         for theme in move.tags or ("calculation",):
-            events.append(WeaknessEvent(profile_id, game_id, move.ply, theme, severity, 1.0))
+            events.append(
+                WeaknessEvent(
+                    profile_id,
+                    game_id,
+                    move.ply,
+                    theme,
+                    severity,
+                    1.0,
+                    observed_at=datetime.now(UTC).isoformat(),
+                )
+            )
     return tuple(events)
 
 
-def aggregate_weaknesses(events: Iterable[WeaknessEvent]) -> tuple[WeaknessScore, ...]:
+def aggregate_weaknesses(
+    events: Iterable[WeaknessEvent], *, now: datetime | None = None
+) -> tuple[WeaknessScore, ...]:
+    reference = now or datetime.now(UTC)
     totals: dict[str, float] = defaultdict(float)
     counts: dict[str, int] = defaultdict(int)
     for event in events:
         direction = -0.5 if event.outcome == "mastered" else 1.0
-        totals[event.theme] += direction * event.severity * event.confidence
+        recency = 1.0
+        if event.observed_at:
+            observed = datetime.fromisoformat(event.observed_at)
+            if observed.tzinfo is None:
+                observed = observed.replace(tzinfo=UTC)
+            age_days = max(0.0, (reference - observed).total_seconds() / 86_400)
+            recency = 0.5 ** (age_days / 90)
+        totals[event.theme] += direction * event.severity * event.confidence * recency
         counts[event.theme] += 1
     return tuple(
         WeaknessScore(theme, round(max(0.0, score), 2), counts[theme])

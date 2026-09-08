@@ -222,4 +222,9 @@ class GameAnalysisService:
             evidence=evidence,
             tags=tuple(dict.fromkeys(fact.tag for fact in evidence)),
             deepened=deep,
+            alternative_moves=tuple(
+                candidate.moves[0].uci()
+                for candidate in best_result.candidates[1:]
+                if candidate.moves and candidate.moves[0] != best
+            ),
         )

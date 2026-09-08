@@ -41,6 +41,7 @@ def generate_practice_items(
                 move.fen,
                 theme,
                 move.best_pv,
+                move.alternative_moves,
                 due_at=now.isoformat(),
             )
     return tuple(items.values())

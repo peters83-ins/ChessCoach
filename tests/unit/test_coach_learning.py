@@ -9,6 +9,7 @@ from chesscoach.coach.models import (
     GamePhase,
     MoveAnalysis,
     MoveClassification,
+    WeaknessEvent,
 )
 from chesscoach.coach.practice import generate_practice_items, schedule_attempt
 from chesscoach.coach.weakness import aggregate_weaknesses, weakness_events
@@ -54,3 +55,11 @@ def test_weaknesses_generate_scheduled_practice_and_lessons() -> None:
     lessons = generate_lessons("default", weaknesses, items)
     assert lessons[0].title == "Efficient Development"
     assert lessons[0].exercise_ids == (items[0].id,)
+
+
+def test_old_weakness_evidence_decays() -> None:
+    now = datetime(2026, 6, 1, tzinfo=UTC)
+    recent = WeaknessEvent("p", "g", 1, "fork", 2, 1, observed_at=now.isoformat())
+    old = WeaknessEvent("p", "g2", 1, "material", 2, 1, observed_at="2025-06-01T00:00:00+00:00")
+    scores = {item.theme: item.score for item in aggregate_weaknesses((recent, old), now=now)}
+    assert scores["fork"] > scores["material"]

@@ -78,6 +78,7 @@ class MoveAnalysis:
     evidence: tuple[Evidence, ...] = ()
     tags: tuple[str, ...] = ()
     deepened: bool = False
+    alternative_moves: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -152,6 +153,7 @@ class WeaknessEvent:
     severity: float
     confidence: float
     outcome: str = "observed"
+    observed_at: str = ""
 
 
 @dataclass(frozen=True)

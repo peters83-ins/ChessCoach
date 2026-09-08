@@ -114,3 +114,18 @@ def test_openai_feedback_rejects_unknown_evidence_and_illegal_lines() -> None:
             ),
             "model",
         ).generate((context(),))
+    with pytest.raises(FeedbackError, match="not supplied"):
+        OpenAIProvider(
+            FakeClient(
+                {
+                    "feedback": [
+                        {
+                            **base,
+                            "evidence_ids": ["fact-1"],
+                            "continuation": ["g1f3"],
+                        }
+                    ]
+                }
+            ),
+            "model",
+        ).generate((context(),))
