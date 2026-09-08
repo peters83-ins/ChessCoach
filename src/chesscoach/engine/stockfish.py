@@ -1,5 +1,8 @@
 """Bounded local UCI searches. Call blocking methods outside the GUI thread."""
 
+import subprocess
+import sys
+
 import chess
 import chess.engine
 
@@ -12,7 +15,12 @@ class Stockfish:
     def __init__(self, path: str) -> None:
         if not path.strip():
             raise ValueError("Select a Stockfish executable or set STOCKFISH_PATH.")
-        self._engine = chess.engine.SimpleEngine.popen_uci(path, timeout=3.0)
+        if sys.platform == "win32":
+            self._engine = chess.engine.SimpleEngine.popen_uci(
+                path, timeout=3.0, creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        else:
+            self._engine = chess.engine.SimpleEngine.popen_uci(path, timeout=3.0)
 
     def configure_difficulty(self, elo: int) -> int:
         """Return the actual target after clamping to this executable's UCI range."""

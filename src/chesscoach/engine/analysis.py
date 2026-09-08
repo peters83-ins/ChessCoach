@@ -1,4 +1,4 @@
-"""Engine contracts only; a Stockfish subprocess adapter is a future milestone."""
+"""Shared result types and interface for local engine analysis."""
 
 from dataclasses import dataclass
 from typing import Protocol

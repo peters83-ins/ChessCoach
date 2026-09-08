@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+from contextlib import closing
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -70,7 +71,7 @@ class GameDatabase:
     def save_game(self, game_data: GameData) -> str:
         """Insert/update one match atomically; repeated Save clicks never duplicate it."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path, timeout=2.0) as connection:
+        with closing(sqlite3.connect(self.path, timeout=2.0)) as connection, connection:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS games ("
                 "id TEXT PRIMARY KEY, started_at TEXT NOT NULL, saved_at TEXT NOT NULL, "
@@ -81,7 +82,7 @@ class GameDatabase:
                 "INSERT INTO games VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(id) DO UPDATE SET saved_at=excluded.saved_at, "
                 "ended_at=excluded.ended_at, result=excluded.result, "
-                "pgn=excluded.pgn, data_json=excluded.data_json",
+                "bot_elo=excluded.bot_elo, pgn=excluded.pgn, data_json=excluded.data_json",
                 (
                     game_data.id,
                     game_data.started_at,
