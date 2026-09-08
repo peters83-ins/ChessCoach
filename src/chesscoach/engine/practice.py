@@ -1,0 +1,33 @@
+"""Approximate beginner opponents, not calibrated Elo ratings."""
+
+import hashlib
+import math
+import random
+
+import chess
+
+from chesscoach.engine.analysis import PositionAnalysis
+
+TEMPERATURES = {800: 180.0, 1000: 100.0, 1200: 45.0}
+
+
+def practice_move(analysis: PositionAnalysis, turn: chess.Color, level: int) -> chess.Move:
+    """Sample engine-ranked legal moves, allowing more errors at easier levels.
+
+    Position/level seeding makes selection reproducible for identical analysis.
+    Engine evaluations themselves are never weakened or fabricated.
+    """
+    lines = sorted(
+        (line for line in analysis.candidates if line.moves),
+        key=lambda line: line.moves[0].uci(),
+    )
+    if not lines:
+        raise ValueError("Stockfish returned no candidate moves.")
+    scores = [line.score.pov(turn).score(mate_score=100_000) for line in lines]
+    values = [float(score) for score in scores if score is not None]
+    if len(values) != len(lines):
+        raise ValueError("Stockfish returned an unknown evaluation.")
+    best = max(values)
+    weights = [math.exp((score - best) / TEMPERATURES[level]) for score in values]
+    seed = hashlib.sha256(f"{analysis.fen}:{level}".encode()).digest()
+    return random.Random(seed).choices(lines, weights=weights, k=1)[0].moves[0]

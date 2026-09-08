@@ -21,6 +21,18 @@ In the app, choose **White or Black**, choose a difficulty, **Browse** to the
 executable, then **Start Match**. Selecting Black flips the board and Stockfish
 plays first. Alternatively, choose **Local two-player** without an engine.
 
+The “Stockfish executable” is the engine program (`stockfish.exe` on Windows),
+not a credential or a PGN file. The app automatically checks PATH and its per-user
+engine folder: `%LOCALAPPDATA%\ChessCoach\engines\stockfish.exe` on Windows, or
+`$XDG_DATA_HOME/ChessCoach/engines/stockfish` on Linux (defaulting to
+`~/.local/share/ChessCoach/engines/stockfish`). The official download link is shown
+in setup. Extract the download before choosing the executable.
+
+Before a match starts, clicking a piece previews its legal destinations. Moving
+requires **Start Match**; the status explains this directly. If no engine is
+selected, the button says **Choose Stockfish first**. Local two-player mode needs
+no engine. During a bot turn, piece input stays locked until the computer replies.
+
 To prefill the engine path, set `STOCKFISH_PATH` in your environment or local `.env`.
 You can copy `.env.example` to `.env`; environment variables take precedence.
 `.env`, virtual environments, databases, and generated output remain ignored.
@@ -38,7 +50,12 @@ No Stockfish binaries or credentials are committed.
 - Stockfish supplies a current-position evaluation from White's perspective and a
   best move. Positive scores favor White; signed mate scores identify the winning
   side. Analysis is full-strength; opponent moves use the selected difficulty.
-- Bot tiers target approximately 1400, 1800, or 2200 Elo. Targets are clamped to the
+- Beginner practice tiers are labelled approximately **800, 1000, and 1200**.
+  They deliberately sample weaker Stockfish-ranked legal moves, allowing more
+  errors at easier levels. They are **uncalibrated practice settings**, not native
+  Stockfish Elo values or measured human ratings; they are never silently replaced
+  with the engine's minimum rating. The selected practice label is saved with the match.
+- Native bot tiers target approximately 1400, 1800, or 2200 Elo. Targets are clamped to the
   installed engine's advertised range; the actual target is displayed and saved.
   These are approximate engine settings, not guaranteed human ratings. See the
   [Stockfish difficulty documentation](https://official-stockfish.github.io/docs/stockfish-wiki/Stockfish-FAQ.html#how-do-skill-level-and-uci_elo-work).
@@ -56,6 +73,12 @@ Searches use 0.2 seconds for evaluation and 0.3 seconds for opponent moves, plus
 startup overhead. These short searches provide practical estimates, not exhaustive
 analysis. Difficulty limiting may intentionally choose a weaker move than the
 full-strength analysis recommendation.
+
+Beginner searches rank legal moves using MultiPV, capped at 12,000 nodes and 0.3
+seconds. Move selection uses a score-weighted distribution with position/level
+seeding; identical candidate scores and positions yield identical choices.
+Engine scores themselves remain unchanged. Full-strength position analysis is
+kept separate from weakened opponent move selection.
 
 ## Saved games
 
@@ -105,6 +128,8 @@ src/chesscoach/
   engine/
     analysis.py           Evaluation and candidate-line contracts
     stockfish.py          Local UCI adapter and difficulty control
+    practice.py           Approximate beginner move selection
+    discovery.py          Per-user engine/PATH discovery
     worker.py             Cancellable background searches
   ui/
     main_window.py        Match flow and controls

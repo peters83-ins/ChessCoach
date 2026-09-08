@@ -7,12 +7,21 @@ import chess
 import chess.engine
 
 from chesscoach.engine.analysis import CandidateLine, PositionAnalysis
+from chesscoach.engine.practice import TEMPERATURES, practice_move
 
-DIFFICULTIES = {"Club · ~1400": 1400, "Intermediate · ~1800": 1800, "Strong · ~2200": 2200}
+DIFFICULTIES = {
+    "Beginner · ~800 practice": 800,
+    "Casual · ~1000 practice": 1000,
+    "Improving · ~1200 practice": 1200,
+    "Club · ~1400": 1400,
+    "Intermediate · ~1800": 1800,
+    "Strong · ~2200": 2200,
+}
 
 
 class Stockfish:
     def __init__(self, path: str) -> None:
+        self.practice_level: int | None = None
         if not path.strip():
             raise ValueError("Select a Stockfish executable or set STOCKFISH_PATH.")
         if sys.platform == "win32":
@@ -23,15 +32,26 @@ class Stockfish:
             self._engine = chess.engine.SimpleEngine.popen_uci(path, timeout=3.0)
 
     def configure_difficulty(self, elo: int) -> int:
-        """Return the actual target after clamping to this executable's UCI range."""
+        """Return the practice label, or the native target clamped to the UCI range."""
         option = self._engine.options.get("UCI_Elo")
         if option is None or "UCI_LimitStrength" not in self._engine.options:
             raise ValueError("This engine does not support Stockfish Elo difficulty settings.")
         actual = max(option.min or elo, min(elo, option.max or elo))
+        self.practice_level = elo if elo in TEMPERATURES else None
         self._engine.configure({"UCI_LimitStrength": True, "UCI_Elo": actual})
-        return actual
+        return elo if self.practice_level is not None else actual
 
     def play(self, position: chess.Board) -> chess.Move:
+        if self.practice_level is not None:
+            analysis = self.analyze(
+                position,
+                limit=chess.engine.Limit(time=0.3, nodes=12_000),
+                multipv=position.legal_moves.count(),
+            )
+            move = practice_move(analysis, position.turn, self.practice_level)
+            if move not in position.legal_moves:
+                raise ValueError("Stockfish returned an illegal practice move.")
+            return move
         result = self._engine.play(position, chess.engine.Limit(time=0.3))
         if result.move is None or result.move not in position.legal_moves:
             raise ValueError("Stockfish returned no legal move. Retry the engine search.")

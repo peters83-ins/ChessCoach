@@ -56,19 +56,32 @@ def test_real_worker_and_cancellation(app: QApplication) -> None:
     assert all(not worker.isRunning() for worker in runner.workers)
 
 
-def test_real_window_engine_opens_for_black(app: QApplication, tmp_path: Path) -> None:
+@pytest.mark.parametrize("color", [chess.WHITE, chess.BLACK])
+@pytest.mark.parametrize("level", [800, 1000, 1200])
+def test_real_window_beginner_opponent(
+    app: QApplication,
+    tmp_path: Path,
+    color: chess.Color,
+    level: int,
+) -> None:
     window = MainWindow(database=GameDatabase(tmp_path / "match.sqlite3"))
     window.setup.engine_path.setText(ENGINE_PATH)
-    window.setup.color.setCurrentIndex(1)
+    window.setup.color.setCurrentIndex(0 if color else 1)
+    window.setup.difficulty.setCurrentIndex(window.setup.difficulty.findData(level))
     window.show()
     window.start_match()
+    if color == chess.WHITE:
+        window.board.select_square(chess.E2)
+        window.board.select_square(chess.E4)
     try:
+        target = 2 if color else 1
         deadline = time.monotonic() + 8
-        while not window.game.history() and time.monotonic() < deadline:
+        while len(window.game.history()) < target and time.monotonic() < deadline:
             app.processEvents()
             time.sleep(0.01)
-        assert len(window.game.history()) == 1
-        assert window.game.turn == chess.BLACK
+        assert len(window.game.history()) == target
+        assert window.game.turn == color
+        assert window.match.elo == level
         assert window.board.input_allowed
         assert window.match.move_timestamps
     finally:
