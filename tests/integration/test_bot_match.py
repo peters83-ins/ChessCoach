@@ -197,6 +197,34 @@ def test_load_saved_game_for_analysis(
     assert not window.setup.isEnabled()
     assert window.board.preview_only
     assert window.statusBar().currentMessage() == "Saved game loaded."
+    assert window.review_panel.slider.maximum() == 2
+    assert window.review_panel.slider.value() == 2
+
+    window.review_panel.start_button.click()
+    assert window.game.fen == chess.STARTING_FEN
+    assert window.review_panel.played_label.text() == "Played: —"
+    window.review_panel.next_button.click()
+    assert [move.san for move in window.game.history()] == ["e4"]
+    assert "e4 (White)" in window.review_panel.played_label.text()
+    assert "#72a7d8" in window.board.squares[chess.E4].styleSheet()
+
+    request_count = len(runner.requests)
+    window.analyze_review_position()
+    assert len(runner.requests) == request_count + 1
+    assert runner.requests[-1][3] is False
+    runner.respond()
+    assert window.review_panel.best_label.text() != "Engine best: —"
+    assert window.review_panel.evaluation_label.text().endswith("+0.25")
+    best = next(iter(runner.requests[-1][0].legal_moves))
+    assert "#9b35ad" in window.board.squares[best.from_square].styleSheet()
+
+    cached_request_count = len(runner.requests)
+    window.review_panel.start_button.click()
+    window.review_panel.next_button.click()
+    assert len(runner.requests) == cached_request_count
+    assert window.review_panel.evaluation_label.text().endswith("+0.25")
+    window.review_panel.end_button.click()
+    assert len(window.game.history()) == 2
     window.new_game()
     assert window.setup.isEnabled()
 

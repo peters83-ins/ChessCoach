@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 import chess
-from PySide6.QtCore import QStandardPaths, Qt
+from PySide6.QtCore import QStandardPaths, Qt, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
@@ -20,10 +20,13 @@ from PySide6.QtWidgets import (
 
 from chesscoach.chess.game import Game
 from chesscoach.chess.pgn import export_pgn
+from chesscoach.chess.review import ReviewSession
+from chesscoach.engine.analysis import PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
 from chesscoach.storage.database import GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
+from chesscoach.ui.game_review import GameReview
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import MoveHistory
 from chesscoach.ui.saved_games import SavedGamesDialog
@@ -44,6 +47,12 @@ class MainWindow(QMainWindow):
         self.engine_path = ""
         self.engine_failed = False
         self.review_details = ""
+        self.review: ReviewSession | None = None
+        self.review_cache: dict[str, PositionAnalysis] = {}
+        self.review_timer = QTimer(self)
+        self.review_timer.setSingleShot(True)
+        self.review_timer.setInterval(150)
+        self.review_timer.timeout.connect(self.analyze_review_position)
         self.runner = runner if runner is not None else EngineRunner(self)
         self.runner.result.connect(self.engine_result)
         self.runner.error.connect(self.engine_error)
@@ -81,6 +90,10 @@ class MainWindow(QMainWindow):
         )
         self.attack_toggle.toggled.connect(self.board.set_attacks_visible)
         sidebar.addWidget(self.attack_toggle)
+        self.review_panel = GameReview()
+        self.review_panel.index_changed.connect(self.set_review_index)
+        self.review_panel.hide()
+        sidebar.addWidget(self.review_panel)
         self.engine_label = QLabel("")
         self.engine_label.setWordWrap(True)
         sidebar.addWidget(self.engine_label)
@@ -114,7 +127,7 @@ class MainWindow(QMainWindow):
         self.copy_pgn_button.clicked.connect(self.copy_pgn)
         self.save_button.clicked.connect(self.save_match)
         self.load_button.clicked.connect(self.load_saved_game)
-        self.retry_button.clicked.connect(self.request_engine)
+        self.retry_button.clicked.connect(self.retry_engine)
         self.board.game_changed.connect(self.position_changed)
         self.board.message.connect(self.show_board_message)
         self.refresh()
@@ -133,7 +146,7 @@ class MainWindow(QMainWindow):
             if self.active
             else "Choose color and difficulty, then Start Match."
         )
-        self.history.set_moves(self.game.history())
+        self.history.set_moves(self.review.history if self.review else self.game.history())
         human_turn = self.match is None or self.game.turn == self.match.player_color
         self.board.input_allowed = self.active and human_turn
         self.board.preview_only = not self.active
@@ -152,7 +165,8 @@ class MainWindow(QMainWindow):
         self.save_button.setEnabled(self.match is not None and bool(self.game.history()))
         self.load_button.setEnabled(not self.active)
         self.retry_button.setEnabled(
-            self.match is not None and self.engine_failed and not status.game_over
+            self.engine_failed
+            and ((self.match is not None and not status.game_over) or self.review is not None)
         )
         self.board.refresh()
 
@@ -171,6 +185,11 @@ class MainWindow(QMainWindow):
         self.active = True
         self.engine_failed = False
         self.review_details = ""
+        self.review = None
+        self.review_cache.clear()
+        self.review_timer.stop()
+        self.review_panel.hide()
+        self.board.set_review_moves(None, None)
         self.engine_path = path
         self.match = (
             BotMatch(
@@ -213,6 +232,12 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def engine_result(self, result: SearchResult) -> None:
+        if self.review is not None:
+            self.review_cache[result.analysis.fen] = result.analysis
+            position = self.review.analysis_position(self.review.index)
+            if position is not None and position.fen() == result.analysis.fen:
+                self.show_review_analysis(result.analysis)
+            return
         if self.match is None or not self.active or result.analysis.fen != self.game.fen:
             return
         self.match.elo = result.actual_elo
@@ -243,7 +268,16 @@ class MainWindow(QMainWindow):
     def engine_error(self, message: str) -> None:
         self.engine_failed = True
         self.engine_label.setText(message)
+        if self.review is not None:
+            self.review_panel.best_label.setText("Engine best: Analysis failed")
+            self.review_panel.evaluation_label.setText("Evaluation before move: —")
         self.refresh()
+
+    def retry_engine(self) -> None:
+        if self.review is not None:
+            self.analyze_review_position()
+        else:
+            self.request_engine()
 
     def save_match(self) -> bool:
         if self.match is None or not self.game.history():
@@ -280,25 +314,89 @@ class MainWindow(QMainWindow):
         if data is None:
             self.statusBar().showMessage("Load failed: game no longer exists.")
             return
-        game = Game(data.fens[0])
-        for uci in data.moves:
-            if not game.attempt_move(chess.Move.from_uci(uci)):
-                self.statusBar().showMessage("Load failed: invalid move history.")
-                return
+        try:
+            review = ReviewSession(data)
+        except ValueError as error:
+            self.statusBar().showMessage(f"Load failed: {error}")
+            return
         self.runner.cancel()
-        self.game = game
-        self.board.game = game
         self.match = None
         self.active = False
+        self.review = review
+        self.review_cache.clear()
         self.review_details = (
             f"Saved game for analysis · Player {data.player_color.title()} · "
             f"Bot {data.bot_elo} · Result {data.result}"
         )
         self.setup.setEnabled(False)
         self.board.set_orientation(data.player_color == "white")
-        self.engine_label.clear()
+        self.review_panel.show()
+        self.review_panel.configure(review.total)
+        self.set_review_index(review.total)
         self.statusBar().showMessage("Saved game loaded.")
+
+    def set_review_index(self, index: int) -> None:
+        if self.review is None:
+            return
+        self.runner.cancel()
+        self.review_timer.stop()
+        self.engine_failed = False
+        self.game = self.review.game_at(index)
+        self.board.game = self.game
+        self.review_panel.set_index(index)
+        played = self.review.played_at(index)
+        move = played[0] if played else None
+        played_text = (
+            f"{played[1].number}.{'..' if played[1].color == chess.BLACK else ''} "
+            f"{played[1].san} ({'Black' if played[1].color == chess.BLACK else 'White'})"
+            if played
+            else "—"
+        )
+        self.board.set_review_moves(move, None)
+        self.review_panel.set_details(played_text, "—", "—")
+        self.engine_label.clear()
         self.refresh()
+        position = self.review.analysis_position(index)
+        if position is None:
+            return
+        cached = self.review_cache.get(position.fen())
+        if cached is not None:
+            self.show_review_analysis(cached)
+        elif self.setup.engine_path.text().strip():
+            self.review_panel.set_details(played_text, "Analyzing…", "Analyzing…")
+            self.review_timer.start()
+        else:
+            self.review_panel.set_details(played_text, "Engine unavailable", "—")
+
+    def analyze_review_position(self) -> None:
+        if self.review is None:
+            return
+        position = self.review.analysis_position(self.review.index)
+        path = self.setup.engine_path.text().strip()
+        if position is None or not path:
+            return
+        self.engine_failed = False
+        self.runner.search(position, path, 2200, False)
+
+    def show_review_analysis(self, analysis: PositionAnalysis) -> None:
+        if self.review is None or analysis.best_move is None:
+            return
+        position = self.review.analysis_position(self.review.index)
+        played = self.review.played_at(self.review.index)
+        if position is None or played is None or position.fen() != analysis.fen:
+            return
+        candidate = analysis.candidates[0]
+        score = candidate.score.white()
+        mate = score.mate()
+        evaluation = f"Mate {mate:+d}" if mate is not None else f"{(score.score() or 0) / 100:+.2f}"
+        best_san = position.san(analysis.best_move)
+        played_text = (
+            f"{played[1].number}.{'..' if played[1].color == chess.BLACK else ''} "
+            f"{played[1].san} ({'Black' if played[1].color == chess.BLACK else 'White'})"
+        )
+        self.review_panel.set_details(played_text, best_san, evaluation)
+        self.board.set_review_moves(played[0], analysis.best_move)
+        self.engine_label.setText("Blue: played move · Purple: engine best")
 
     def new_game(self) -> None:
         if not self.save_match():
@@ -307,6 +405,11 @@ class MainWindow(QMainWindow):
         self.match = None
         self.active = False
         self.review_details = ""
+        self.review = None
+        self.review_cache.clear()
+        self.review_timer.stop()
+        self.review_panel.hide()
+        self.board.set_review_moves(None, None)
         self.setup.setEnabled(True)
         self.setup.update_mode()
         self.engine_label.clear()
