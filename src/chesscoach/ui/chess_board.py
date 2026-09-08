@@ -27,6 +27,8 @@ class ChessBoard(QWidget):
         self.selected_square: chess.Square | None = None
         self.orientation = chess.WHITE
         self.input_allowed = True
+        self.preview_only = False
+        self.input_message = "Wait for the computer to move."
         self.squares: dict[chess.Square, QPushButton] = {}
         layout = QGridLayout(self)
         self.board_layout = layout
@@ -118,8 +120,8 @@ class ChessBoard(QWidget):
         self.overlay.update()
 
     def select_square(self, square: chess.Square) -> None:
-        if not self.input_allowed:
-            self.message.emit("Start a match or wait for your turn.")
+        if not self.input_allowed and not self.preview_only:
+            self.message.emit(self.input_message)
             return
         if self.game.status().game_over:
             self.message.emit("Game over. Start a new game or undo a move.")
@@ -131,7 +133,12 @@ class ChessBoard(QWidget):
         if piece and piece.color == self.game.turn:
             self.selected_square = square
             self.refresh()
-            self.message.emit("Choose a highlighted destination.")
+            self.message.emit(
+                self.input_message if self.preview_only else "Choose a highlighted destination."
+            )
+            return
+        if self.preview_only:
+            self.message.emit(self.input_message)
             return
         if self.selected_square is None:
             self.message.emit("Select a piece belonging to the side to move.")

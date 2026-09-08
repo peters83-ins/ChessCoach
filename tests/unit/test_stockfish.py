@@ -25,6 +25,13 @@ def test_difficulty_clamps_to_supported_range(engine: Stockfish) -> None:
     assert engine.configure_difficulty(9999) == 2800
 
 
+@pytest.mark.parametrize("level", [800, 1000, 1200])
+def test_practice_setting_not_silently_clamped(engine: Stockfish, level: int) -> None:
+    assert engine.configure_difficulty(level) == level
+    assert engine.practice_level == level
+    engine._engine.configure.assert_called_with({"UCI_LimitStrength": True, "UCI_Elo": 1500})
+
+
 def test_missing_or_unsupported_engine(engine: Stockfish) -> None:
     with pytest.raises(ValueError, match="executable"):
         Stockfish("")

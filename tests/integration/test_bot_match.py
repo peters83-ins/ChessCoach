@@ -53,6 +53,11 @@ def human_move(window: MainWindow, source: str, target: str) -> None:
 
 def test_setup_white_turns_and_undo(bot: tuple[MainWindow, FakeRunner]) -> None:
     window, runner = bot
+    window.board.select_square(chess.E2)
+    assert window.board.selected_square == chess.E2
+    assert "#246b45" in window.board.squares[chess.E4].styleSheet()
+    assert "Preview only" in window.status_label.text()
+    window.board.clear_selection()
     human_move(window, "e2", "e4")
     assert not window.game.history()
     window.setup.start_button.click()
@@ -155,10 +160,13 @@ def test_save_failure_preserves_game(bot: tuple[MainWindow, FakeRunner], tmp_pat
 def test_missing_engine_and_local_mode(bot: tuple[MainWindow, FakeRunner]) -> None:
     window, runner = bot
     window.setup.engine_path.clear()
+    assert not window.setup.start_button.isEnabled()
+    assert window.setup.start_button.text() == "Choose Stockfish first"
     window.start_match()
     assert not window.active
     assert not runner.requests
     window.setup.mode.setCurrentIndex(1)
+    assert window.setup.start_button.isEnabled()
     window.start_match()
     human_move(window, "e2", "e4")
     human_move(window, "e7", "e5")
