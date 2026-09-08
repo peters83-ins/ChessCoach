@@ -58,10 +58,24 @@ def test_full_strength_analysis_normalizes_score_and_validates_pv(engine: Stockf
             "depth": 12,
         }
     ]
-    result = engine.analyze(chess.Board(), limit=chess.engine.Limit(time=0.1))
+    root = chess.Move.from_uci("e2e4")
+    result = engine.analyze(
+        chess.Board(),
+        limit=chess.engine.Limit(time=0.1),
+        root_moves=(root,),
+        pv_plies=1,
+    )
     assert result.candidates[0].score.white().score() == 34
     assert result.best_move.uci() == "e2e4"
     assert backend.analyse.call_args.kwargs["options"] == {"UCI_LimitStrength": False}
+    assert backend.analyse.call_args.kwargs["root_moves"] == (root,)
+    assert len(result.candidates[0].moves) == 1
     backend.analyse.return_value[0]["pv"] = [chess.Move.from_uci("e2e5")]
     with pytest.raises(ValueError, match="principal variation"):
         engine.analyze(chess.Board(), limit=chess.engine.Limit(time=0.1))
+    with pytest.raises(ValueError, match="Root analysis"):
+        engine.analyze(
+            chess.Board(),
+            limit=chess.engine.Limit(time=0.1),
+            root_moves=(chess.Move.from_uci("e2e5"),),
+        )

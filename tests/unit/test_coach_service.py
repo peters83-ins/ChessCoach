@@ -1,11 +1,13 @@
 from dataclasses import replace
+from threading import Event
 
 import chess
 import chess.engine
+import pytest
 
 from chesscoach.chess.pgn import parse_pgn
 from chesscoach.coach.models import AnalysisProfile
-from chesscoach.coach.service import GameAnalysisService
+from chesscoach.coach.service import AnalysisCancelled, GameAnalysisService
 from chesscoach.engine.analysis import CandidateLine, PositionAnalysis
 from chesscoach.storage.database import GameData
 
@@ -78,3 +80,13 @@ def test_adaptive_analysis_deepens_and_reuses_cache() -> None:
     assert repeated == analysis
     assert FakeEngine.calls == calls
     assert FakeEngine.closed == 2
+
+
+def test_cancelled_analysis_closes_engine() -> None:
+    FakeEngine.calls = FakeEngine.closed = 0
+    cancelled = Event()
+    cancelled.set()
+    with pytest.raises(AnalysisCancelled):
+        GameAnalysisService(FakeEngine).analyze(game_data(), "engine", cancelled=cancelled)
+    assert FakeEngine.calls == 0
+    assert FakeEngine.closed == 1

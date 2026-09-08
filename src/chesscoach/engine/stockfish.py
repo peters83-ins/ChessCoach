@@ -75,6 +75,10 @@ class Stockfish:
             raise ValueError("Cannot analyze an invalid position.")
         if multipv < 1:
             raise ValueError("MultiPV must be positive.")
+        if root_moves is not None and any(move not in position.legal_moves for move in root_moves):
+            raise ValueError("Root analysis moves must be legal in the supplied position.")
+        if pv_plies is not None and pv_plies < 1:
+            raise ValueError("PV length must be positive.")
         # Analysis uses full strength even when the opponent is strength-limited.
         information = self._engine.analyse(
             position,

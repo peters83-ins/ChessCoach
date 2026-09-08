@@ -9,6 +9,7 @@ from chesscoach.coach.scoring import (
     engine_score,
     move_accuracy,
     move_loss,
+    pov_score,
     white_win_probability,
 )
 
@@ -22,6 +23,7 @@ def test_scores_are_white_normalized_and_symmetric() -> None:
         centipawns=-125
     )
     assert white_win_probability(EngineScore(mate=3)) == 0.99
+    assert pov_score(positive).white().score() == 250
 
 
 def test_loss_classification_and_accuracy() -> None:

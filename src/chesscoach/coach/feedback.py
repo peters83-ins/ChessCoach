@@ -17,6 +17,7 @@ class FeedbackError(ValueError):
 
 class FeedbackProvider(Protocol):
     name: str
+    model: str
 
     def generate(self, contexts: Sequence[CoachingContext]) -> tuple[CoachFeedback, ...]: ...
 
@@ -35,6 +36,7 @@ class ResponsesClient(Protocol):
 
 class LocalTemplateProvider:
     name = "local"
+    model = ""
 
     def generate(self, contexts: Sequence[CoachingContext]) -> tuple[CoachFeedback, ...]:
         return tuple(self._one(context) for context in contexts)
@@ -64,6 +66,7 @@ class LocalTemplateProvider:
             takeaway,
             1.0,
             self.name,
+            context_hash=context.context_hash,
         )
 
 
@@ -87,6 +90,8 @@ class OpenAIProvider:
             ),
             input=json.dumps(payloads),
             text={"format": _response_format()},
+            store=False,
+            timeout=30.0,
         )
         try:
             items = json.loads(response.output_text)["feedback"]
@@ -98,8 +103,9 @@ class OpenAIProvider:
             raise FeedbackError("The AI response did not cover the requested moves.")
         return feedback
 
-    @staticmethod
-    def _validate_item(item: dict[str, Any], contexts: dict[int, CoachingContext]) -> CoachFeedback:
+    def _validate_item(
+        self, item: dict[str, Any], contexts: dict[int, CoachingContext]
+    ) -> CoachFeedback:
         try:
             ply = int(item["ply"])
             context = contexts[ply]
@@ -131,6 +137,8 @@ class OpenAIProvider:
             max(0.0, min(confidence, 1.0)),
             "openai",
             PROMPT_VERSION,
+            self.model,
+            context.context_hash,
         )
 
 

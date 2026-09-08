@@ -23,6 +23,15 @@ def engine_score(score: chess.engine.PovScore) -> EngineScore:
     )
 
 
+def pov_score(score: EngineScore) -> chess.engine.PovScore:
+    value: chess.engine.Score = (
+        chess.engine.Mate(score.mate)
+        if score.mate is not None
+        else chess.engine.Cp(score.centipawns or 0)
+    )
+    return chess.engine.PovScore(value, chess.WHITE)
+
+
 def white_win_probability(score: EngineScore) -> float:
     if score.mate is not None:
         return 0.99 if score.mate > 0 else 0.01
@@ -127,8 +136,8 @@ def phase_summaries(moves: Iterable[MoveAnalysis], player_color: str) -> tuple[P
 
 def turning_points(moves: tuple[MoveAnalysis, ...]) -> tuple[int, ...]:
     result: list[int] = []
-    previous_probability = 0.5
     for move in moves:
+        previous_probability = white_win_probability(move.best_score)
         probability = white_win_probability(move.played_score)
         favored_changed = (previous_probability - 0.5) * (probability - 0.5) < 0
         crossed = any(
@@ -143,5 +152,4 @@ def turning_points(moves: tuple[MoveAnalysis, ...]) -> tuple[int, ...]:
             or move.played_score.mate is not None
         ):
             result.append(move.ply)
-        previous_probability = probability
     return tuple(result)

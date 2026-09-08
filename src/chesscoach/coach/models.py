@@ -1,5 +1,7 @@
 """Stable domain contracts for analysis and coaching."""
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -119,6 +121,11 @@ class CoachingContext:
             ],
         }
 
+    @property
+    def context_hash(self) -> str:
+        payload = json.dumps(self.selected_payload(), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode()).hexdigest()
+
 
 @dataclass(frozen=True)
 class CoachFeedback:
@@ -132,6 +139,8 @@ class CoachFeedback:
     confidence: float
     provider: str
     prompt_version: str = "coach-v1"
+    model: str = ""
+    context_hash: str = ""
 
 
 @dataclass(frozen=True)
@@ -184,6 +193,26 @@ class Lesson:
     common_error: str
     exercise_ids: tuple[str, ...]
     completed: bool = False
+
+
+@dataclass(frozen=True)
+class GameReport:
+    accuracy: float
+    summary: str
+    strongest_plies: tuple[int, ...]
+    critical_plies: tuple[int, ...]
+    recurring_themes: tuple[str, ...]
+    phase_summaries: tuple[PhaseSummary, ...]
+
+
+@dataclass(frozen=True)
+class CoachBundle:
+    analysis: GameAnalysis
+    feedback: tuple[CoachFeedback, ...]
+    weaknesses: tuple[WeaknessScore, ...]
+    practice: tuple[PracticeItem, ...]
+    lessons: tuple[Lesson, ...]
+    report: GameReport
 
 
 @dataclass

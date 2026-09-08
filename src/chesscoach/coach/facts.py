@@ -63,6 +63,15 @@ def extract_evidence(
                 forked,
             )
         )
+        if moved_piece and moved_piece.piece_type == chess.KNIGHT:
+            facts.append(
+                Evidence(
+                    "played-knight-tactic",
+                    "knight_tactics",
+                    f"{played_san} uses a knight to attack multiple valuable pieces.",
+                    forked,
+                )
+            )
     before_pins = {
         sq for sq in chess.SQUARES if board.piece_at(sq) and board.is_pinned(not mover, sq)
     }
@@ -91,6 +100,16 @@ def extract_evidence(
                     best_fork,
                 )
             )
+            best_piece = board.piece_at(best.from_square)
+            if best_piece and best_piece.piece_type == chess.KNIGHT:
+                facts.append(
+                    Evidence(
+                        "missed-knight-tactic",
+                        "knight_tactics",
+                        f"Stockfish's {best_san} creates a knight fork.",
+                        best_fork,
+                    )
+                )
         if best_capture and not captured:
             facts.append(
                 Evidence(
@@ -112,6 +131,23 @@ def extract_evidence(
     ):
         facts.append(
             Evidence("development", "opening_development", f"{played_san} develops a minor piece.")
+        )
+    phase = game_phase(board)
+    if phase == GamePhase.OPENING:
+        facts.append(
+            Evidence(
+                "opening-context",
+                "opening_principles",
+                "This opening decision affects development, central control, or king safety.",
+            )
+        )
+    elif phase == GamePhase.ENDGAME:
+        facts.append(
+            Evidence(
+                "endgame-context",
+                "endgame",
+                "King activity and pawn promotion are central in this endgame.",
+            )
         )
     if not facts:
         facts.append(

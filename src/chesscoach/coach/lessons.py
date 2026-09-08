@@ -23,6 +23,24 @@ LESSON_TEMPLATES = {
         ("Move minor pieces once when possible.", "Connect rooks by clearing the back rank."),
         "Repeating moves while undeveloped pieces remain at home.",
     ),
+    "opening_principles": (
+        "Opening Priorities",
+        "Fight for the center, develop efficiently, and secure the king before attacking.",
+        ("Count undeveloped pieces.", "Check whether the king can castle safely."),
+        "Starting flank operations while the center and king remain unresolved.",
+    ),
+    "knight_tactics": (
+        "Knight Tactical Patterns",
+        "Knight jumps cannot be blocked and can attack several valuable targets.",
+        ("Map every checking jump.", "Look for two valuable targets of one knight."),
+        "Seeing the first attacked piece while overlooking a second fork target.",
+    ),
+    "endgame": (
+        "Endgame Priorities",
+        "Activate the king and calculate pawn races before making distant piece moves.",
+        ("Count moves to promotion.", "Bring the king toward passed pawns."),
+        "Keeping the king passive after queens and major pieces are exchanged.",
+    ),
     "calculation": (
         "Forcing-Move Calculation",
         "Calculate checks, captures, and direct threats before quieter moves.",

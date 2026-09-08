@@ -10,10 +10,12 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -21,11 +23,18 @@ from PySide6.QtWidgets import (
 from chesscoach.chess.game import Game
 from chesscoach.chess.pgn import export_pgn
 from chesscoach.chess.review import ReviewSession
+from chesscoach.coach.models import AnalysisProgress, CoachBundle, MoveAnalysis
+from chesscoach.coach.pipeline import CoachPipeline
+from chesscoach.coach.scoring import pov_score
+from chesscoach.coach.worker import CoachRunner
+from chesscoach.config import Settings
 from chesscoach.engine.analysis import PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
+from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
+from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog, PracticeDialog
 from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.game_review import GameReview
 from chesscoach.ui.match_setup import MatchSetup
@@ -40,6 +49,7 @@ class MainWindow(QMainWindow):
         *,
         database: GameDatabase | None = None,
         runner: EngineRunner | None = None,
+        coach_runner: CoachRunner | None = None,
     ) -> None:
         super().__init__()
         self.game = game if game is not None else Game()
@@ -50,6 +60,8 @@ class MainWindow(QMainWindow):
         self.review_details = ""
         self.review: ReviewSession | None = None
         self.review_cache: dict[str, PositionAnalysis] = {}
+        self.coach_bundle: CoachBundle | None = None
+        self.coach_running = False
         self.review_timer = QTimer(self)
         self.review_timer.setSingleShot(True)
         self.review_timer.setInterval(150)
@@ -64,6 +76,12 @@ class MainWindow(QMainWindow):
             data_dir / "games" / "games.sqlite3",
             legacy_path=data_dir / "games.sqlite3",
         )
+        self.coach_repository = CoachRepository(self.database.path)
+        self.coach_runner = coach_runner or CoachRunner(self)
+        self.coach_runner.progress.connect(self.coach_progress)
+        self.coach_runner.result.connect(self.coach_result)
+        self.coach_runner.error.connect(self.coach_error)
+        self.coach_settings = Settings.from_environment(Path(".env"))
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
         central = QWidget()
@@ -77,9 +95,16 @@ class MainWindow(QMainWindow):
         board_layout.addWidget(self.evaluation_bar)
         self.board = ChessBoard(self.game)
         board_layout.addWidget(self.board, 1)
-        layout.addWidget(board_area, 3)
-        sidebar = QVBoxLayout()
-        layout.addLayout(sidebar, 1)
+        layout.addWidget(board_area, 2)
+        sidebar_container = QWidget()
+        sidebar_container.setMinimumWidth(340)
+        sidebar = QVBoxLayout(sidebar_container)
+        sidebar_scroll = QScrollArea()
+        sidebar_scroll.setWidgetResizable(True)
+        sidebar_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        sidebar_scroll.setWidget(sidebar_container)
+        layout.addWidget(sidebar_scroll, 1)
         title = QLabel("Chess Coach")
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
         sidebar.addWidget(title)
@@ -102,6 +127,16 @@ class MainWindow(QMainWindow):
         self.review_panel.index_changed.connect(self.set_review_index)
         self.review_panel.hide()
         sidebar.addWidget(self.review_panel)
+        self.coach_panel = CoachPanel()
+        self.coach_panel.hide()
+        self.coach_panel.set_ai_ready(
+            bool(self.coach_settings.openai_api_key and self.coach_settings.openai_model)
+        )
+        self.coach_panel.analyze_requested.connect(self.start_coach_analysis)
+        self.coach_panel.cancel_requested.connect(self.cancel_coach_analysis)
+        self.coach_panel.practice_requested.connect(self.open_practice)
+        self.coach_panel.lessons_requested.connect(self.open_lessons)
+        sidebar.addWidget(self.coach_panel)
         self.engine_label = QLabel("")
         self.engine_label.setWordWrap(True)
         sidebar.addWidget(self.engine_label)
@@ -195,8 +230,13 @@ class MainWindow(QMainWindow):
         self.review_details = ""
         self.review = None
         self.review_cache.clear()
+        self.coach_bundle = None
+        self.coach_running = False
+        self.coach_runner.cancel()
         self.review_timer.stop()
         self.review_panel.hide()
+        self.coach_panel.clear()
+        self.coach_panel.hide()
         self.board.set_review_moves(None, None)
         self.evaluation_bar.clear()
         self.engine_path = path
@@ -339,14 +379,20 @@ class MainWindow(QMainWindow):
         self.active = False
         self.review = review
         self.review_cache.clear()
+        self.coach_bundle = CoachPipeline(self.coach_repository).load(data)
+        self.coach_panel.clear()
         self.review_details = (
             f"Saved game for analysis · Player {data.player_color.title()} · "
             f"Bot {data.bot_elo} · Result {data.result}"
         )
         self.setup.setEnabled(False)
+        self.setup.hide()
         self.board.set_orientation(data.player_color == "white")
         self.evaluation_bar.set_orientation(data.player_color == "white")
         self.review_panel.show()
+        self.coach_panel.show()
+        if self.coach_bundle is not None:
+            self.coach_panel.set_bundle(self.coach_bundle, data.player_color)
         self.review_panel.configure(review.total)
         self.set_review_index(review.total)
         self.statusBar().showMessage("Saved game loaded.")
@@ -360,6 +406,7 @@ class MainWindow(QMainWindow):
         self.game = self.review.game_at(index)
         self.board.game = self.game
         self.review_panel.set_index(index)
+        self.coach_panel.show_ply(index)
         played = self.review.played_at(index)
         move = played[0] if played else None
         played_text = (
@@ -375,6 +422,13 @@ class MainWindow(QMainWindow):
         self.refresh()
         position = self.review.analysis_position(index)
         if position is None:
+            return
+        if self.coach_bundle is not None and index <= len(self.coach_bundle.analysis.moves):
+            analyzed = self.coach_bundle.analysis.moves[index - 1]
+            if analyzed.fen == position.fen():
+                self.show_coach_move(analyzed)
+                return
+        if self.coach_running:
             return
         cached = self.review_cache.get(position.fen())
         if cached is not None:
@@ -416,6 +470,82 @@ class MainWindow(QMainWindow):
         self.evaluation_bar.set_score(candidate.score)
         self.engine_label.setText("Blue: played move · Purple: engine best")
 
+    def show_coach_move(self, analyzed: MoveAnalysis) -> None:
+        if self.review is None:
+            return
+        played = self.review.played_at(analyzed.ply)
+        position = self.review.analysis_position(analyzed.ply)
+        if played is None or position is None:
+            return
+        best = chess.Move.from_uci(analyzed.best_uci)
+        score = analyzed.best_score
+        evaluation = (
+            f"Mate {score.mate:+d}"
+            if score.mate is not None
+            else f"{(score.centipawns or 0) / 100:+.2f}"
+        )
+        played_text = (
+            f"{played[1].number}.{'..' if played[1].color == chess.BLACK else ''} "
+            f"{played[1].san} ({'Black' if played[1].color == chess.BLACK else 'White'})"
+        )
+        self.review_panel.set_details(played_text, analyzed.best_san, evaluation)
+        self.board.set_review_moves(played[0], best)
+        self.evaluation_bar.set_score(pov_score(score))
+        self.engine_label.setText(
+            f"{analyzed.classification.value.title()} · {analyzed.accuracy:.1f}% move accuracy"
+        )
+
+    def start_coach_analysis(self) -> None:
+        if self.review is None:
+            return
+        path = self.setup.engine_path.text().strip()
+        if not path:
+            self.statusBar().showMessage("Select a Stockfish executable before analysis.")
+            return
+        self.runner.cancel()
+        self.review_timer.stop()
+        self.coach_running = True
+        self.coach_panel.set_running(True)
+        self.coach_runner.start(
+            self.review.data,
+            path,
+            self.coach_repository,
+            self.coach_settings,
+        )
+
+    def coach_progress(self, progress: AnalysisProgress) -> None:
+        self.coach_panel.set_progress(progress.completed, progress.total, progress.stage)
+
+    def coach_result(self, bundle: CoachBundle) -> None:
+        if self.review is None or bundle.analysis.game_id != self.review.data.id:
+            return
+        self.coach_running = False
+        self.coach_bundle = bundle
+        self.coach_panel.set_bundle(bundle, self.review.data.player_color)
+        self.set_review_index(self.review.index)
+        self.statusBar().showMessage("Full-game coaching analysis complete.")
+
+    def coach_error(self, message: str) -> None:
+        self.coach_running = False
+        self.coach_panel.set_running(False)
+        self.coach_panel.feedback.setText(message)
+
+    def cancel_coach_analysis(self) -> None:
+        self.coach_runner.cancel()
+        self.coach_running = False
+        self.coach_panel.set_running(False)
+        self.coach_panel.feedback.setText("Analysis cancelled; completed positions remain cached.")
+
+    def open_practice(self) -> None:
+        if self.coach_bundle is None or not self.coach_bundle.practice:
+            return
+        PracticeDialog(self.coach_bundle.practice[0], self.coach_repository, self).exec()
+
+    def open_lessons(self) -> None:
+        if self.coach_bundle is None or not self.coach_bundle.lessons:
+            return
+        LessonsDialog(self.coach_bundle.lessons, self.coach_repository, self).exec()
+
     def new_game(self) -> None:
         if not self.save_match():
             return
@@ -425,11 +555,17 @@ class MainWindow(QMainWindow):
         self.review_details = ""
         self.review = None
         self.review_cache.clear()
+        self.coach_bundle = None
+        self.coach_running = False
+        self.coach_runner.cancel()
         self.review_timer.stop()
         self.review_panel.hide()
+        self.coach_panel.clear()
+        self.coach_panel.hide()
         self.board.set_review_moves(None, None)
         self.evaluation_bar.clear()
         self.setup.setEnabled(True)
+        self.setup.show()
         self.setup.update_mode()
         self.engine_label.clear()
         self.game.reset()
@@ -466,4 +602,5 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self.runner.shutdown()
+        self.coach_runner.shutdown()
         event.accept()

@@ -23,8 +23,9 @@ from chesscoach.coach.models import (
     WeaknessEvent,
     WeaknessScore,
 )
+from chesscoach.coach.practice import schedule_attempt
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DEFAULT_PROFILE_ID = "default"
 
 
@@ -75,12 +76,37 @@ class CoachRepository:
     def migrate(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(sqlite3.connect(self.path, timeout=3.0)) as connection, connection:
-            version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS schema_versions ("
+                "component TEXT PRIMARY KEY, version INTEGER NOT NULL)"
+            )
+            row = connection.execute(
+                "SELECT version FROM schema_versions WHERE component='coach'"
+            ).fetchone()
+            version = int(row[0]) if row else self._detect_schema_version(connection)
             if version > SCHEMA_VERSION:
                 raise ValueError("The coaching database schema is newer than this application.")
             if version < 1:
                 self._migration_one(connection)
-                connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            elif version < 2:
+                self._migration_one(connection)
+                self._migration_two(connection)
+            if version < SCHEMA_VERSION:
+                connection.execute(
+                    "INSERT INTO schema_versions VALUES ('coach', ?) "
+                    "ON CONFLICT(component) DO UPDATE SET version=excluded.version",
+                    (SCHEMA_VERSION,),
+                )
+
+    @staticmethod
+    def _detect_schema_version(connection: sqlite3.Connection) -> int:
+        exists = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coach_feedback'"
+        ).fetchone()
+        if exists is None:
+            return 0
+        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(coach_feedback)")}
+        return 2 if {"model", "context_hash"}.issubset(columns) else 1
 
     @staticmethod
     def _migration_one(connection: sqlite3.Connection) -> None:
@@ -99,8 +125,9 @@ class CoachRepository:
             "ON DELETE CASCADE)",
             "CREATE TABLE IF NOT EXISTS coach_feedback ("
             "game_id TEXT NOT NULL, ply INTEGER NOT NULL, provider TEXT NOT NULL, "
-            "prompt_version TEXT NOT NULL, data_json TEXT NOT NULL, created_at TEXT NOT NULL, "
-            "PRIMARY KEY(game_id, ply, provider, prompt_version))",
+            "prompt_version TEXT NOT NULL, model TEXT NOT NULL, context_hash TEXT NOT NULL, "
+            "data_json TEXT NOT NULL, created_at TEXT NOT NULL, "
+            "PRIMARY KEY(game_id, ply, provider, prompt_version, model, context_hash))",
             "CREATE TABLE IF NOT EXISTS player_profiles ("
             "id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS weakness_events ("
@@ -131,6 +158,21 @@ class CoachRepository:
             "INSERT OR IGNORE INTO player_profiles VALUES (?, ?, ?)",
             (DEFAULT_PROFILE_ID, "Local player", _now()),
         )
+
+    @staticmethod
+    def _migration_two(connection: sqlite3.Connection) -> None:
+        connection.execute("ALTER TABLE coach_feedback RENAME TO coach_feedback_v1")
+        connection.execute(
+            "CREATE TABLE coach_feedback (game_id TEXT NOT NULL, ply INTEGER NOT NULL, "
+            "provider TEXT NOT NULL, prompt_version TEXT NOT NULL, model TEXT NOT NULL, "
+            "context_hash TEXT NOT NULL, data_json TEXT NOT NULL, created_at TEXT NOT NULL, "
+            "PRIMARY KEY(game_id, ply, provider, prompt_version, model, context_hash))"
+        )
+        connection.execute(
+            "INSERT INTO coach_feedback SELECT game_id, ply, provider, prompt_version, '', '', "
+            "data_json, created_at FROM coach_feedback_v1"
+        )
+        connection.execute("DROP TABLE coach_feedback_v1")
 
     def start_run(self, game_id: str, profile: AnalysisProfile) -> str:
         self.migrate()
@@ -182,6 +224,7 @@ class CoachRepository:
     def load_latest_analysis(self, game_id: str) -> GameAnalysis | None:
         if not self.path.is_file():
             return None
+        self.migrate()
         with closing(sqlite3.connect(self.path)) as connection:
             row = connection.execute(
                 "SELECT id, profile_json FROM analysis_runs WHERE game_id=? AND state='complete' "
@@ -241,7 +284,8 @@ class CoachRepository:
         self.migrate()
         with closing(sqlite3.connect(self.path)) as connection, connection:
             connection.executemany(
-                "INSERT INTO coach_feedback VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO UPDATE SET "
+                "INSERT INTO coach_feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT DO UPDATE SET "
                 "data_json=excluded.data_json, created_at=excluded.created_at",
                 (
                     (
@@ -249,6 +293,8 @@ class CoachRepository:
                         item.ply,
                         item.provider,
                         item.prompt_version,
+                        item.model,
+                        item.context_hash,
                         _json(asdict(item)),
                         _now(),
                     )
@@ -308,8 +354,7 @@ class CoachRepository:
             )
             connection.executemany(
                 "INSERT INTO practice_items VALUES (?, ?, ?, ?, ?, ?, ?) "
-                "ON CONFLICT(id) DO UPDATE SET "
-                "due_at=excluded.due_at, data_json=excluded.data_json",
+                "ON CONFLICT(id) DO NOTHING",
                 (
                     (
                         item.id,
@@ -367,15 +412,59 @@ class CoachRepository:
         self.migrate()
         with closing(sqlite3.connect(self.path)) as connection:
             rows = connection.execute(
-                "SELECT data_json FROM lessons WHERE profile_id=? ORDER BY theme", (profile_id,)
+                "SELECT lessons.data_json, COALESCE(lesson_progress.completed, 0) "
+                "FROM lessons LEFT JOIN lesson_progress ON lesson_progress.lesson_id=lessons.id "
+                "WHERE profile_id=? ORDER BY theme",
+                (profile_id,),
             ).fetchall()
         return tuple(
             Lesson(
                 **{
-                    **data,
+                    **json.loads(row[0]),
                     "recognition_cues": tuple(data["recognition_cues"]),
                     "exercise_ids": tuple(data["exercise_ids"]),
+                    "completed": bool(row[1]),
                 }
             )
-            for data in (json.loads(row[0]) for row in rows)
+            for row in rows
+            for data in (json.loads(row[0]),)
         )
+
+    def record_practice_attempt(
+        self, item: PracticeItem, move_uci: str, successful: bool
+    ) -> PracticeItem:
+        updated = schedule_attempt(item, successful=successful)
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute(
+                "INSERT INTO practice_attempts(item_id, attempted_at, move_uci, successful) "
+                "VALUES (?, ?, ?, ?)",
+                (item.id, _now(), move_uci, successful),
+            )
+            connection.execute(
+                "UPDATE practice_items SET due_at=?, data_json=? WHERE id=?",
+                (updated.due_at, _json(asdict(updated)), item.id),
+            )
+            if successful:
+                connection.execute(
+                    "INSERT INTO weakness_events(profile_id, game_id, ply, theme, severity, "
+                    "confidence, outcome, created_at) VALUES (?, ?, ?, ?, 1, 1, 'mastered', ?) "
+                    "ON CONFLICT(profile_id, game_id, ply, theme, outcome) DO UPDATE SET "
+                    "created_at=excluded.created_at",
+                    (
+                        item.profile_id,
+                        item.source_game_id,
+                        item.source_ply,
+                        item.theme,
+                        _now(),
+                    ),
+                )
+        return updated
+
+    def set_lesson_completed(self, lesson_id: str, completed: bool = True) -> None:
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute(
+                "INSERT INTO lesson_progress VALUES (?, ?, ?) ON CONFLICT(lesson_id) "
+                "DO UPDATE SET completed=excluded.completed, updated_at=excluded.updated_at",
+                (lesson_id, completed, _now()),
+            )

@@ -10,13 +10,17 @@ INTERVALS = (1, 3, 7, 14, 30)
 
 
 def generate_practice_items(
-    profile_id: str, game_id: str, moves: tuple[MoveAnalysis, ...]
+    profile_id: str,
+    game_id: str,
+    moves: tuple[MoveAnalysis, ...],
+    player_color: str | None = None,
 ) -> tuple[PracticeItem, ...]:
     items: dict[tuple[str, str], PracticeItem] = {}
     now = datetime.now(UTC)
     for move in moves:
         if (
-            move.classification
+            (player_color is not None and move.mover != player_color)
+            or move.classification
             not in (
                 MoveClassification.INACCURACY,
                 MoveClassification.MISTAKE,
@@ -25,20 +29,20 @@ def generate_practice_items(
             or not move.best_pv
         ):
             continue
-        theme = move.tags[0] if move.tags else "calculation"
         normalized_fen = " ".join(move.fen.split()[:4])
-        key = (normalized_fen, theme)
-        identifier = str(uuid5(NAMESPACE_URL, f"{profile_id}:{game_id}:{move.ply}:{theme}"))
-        items[key] = PracticeItem(
-            identifier,
-            profile_id,
-            game_id,
-            move.ply,
-            move.fen,
-            theme,
-            move.best_pv,
-            due_at=now.isoformat(),
-        )
+        for theme in move.tags or ("calculation",):
+            key = (normalized_fen, theme)
+            identifier = str(uuid5(NAMESPACE_URL, f"{profile_id}:{game_id}:{move.ply}:{theme}"))
+            items[key] = PracticeItem(
+                identifier,
+                profile_id,
+                game_id,
+                move.ply,
+                move.fen,
+                theme,
+                move.best_pv,
+                due_at=now.isoformat(),
+            )
     return tuple(items.values())
 
 
