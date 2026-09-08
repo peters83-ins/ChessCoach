@@ -1,11 +1,13 @@
 """Clickable board with coordinates and explicit promotion selection."""
 
 import chess
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QIcon, QResizeEvent
 from PySide6.QtWidgets import QGridLayout, QInputDialog, QLabel, QPushButton, QSizePolicy, QWidget
 
 from chesscoach.chess.game import Game
+from chesscoach.ui.attack_overlay import AttackOverlay
+from chesscoach.ui.piece_assets import piece_icon
 
 PROMOTIONS = {
     "Queen": chess.QUEEN,
@@ -23,21 +25,25 @@ class ChessBoard(QWidget):
         super().__init__(parent)
         self.game = game
         self.selected_square: chess.Square | None = None
+        self.orientation = chess.WHITE
+        self.input_allowed = True
         self.squares: dict[chess.Square, QPushButton] = {}
         layout = QGridLayout(self)
+        self.board_layout = layout
+        self.rank_labels: list[QLabel] = []
+        self.file_labels: list[QLabel] = []
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
-        font = QFont("Segoe UI Symbol", 32)
-        font.setFamilies(["Segoe UI Symbol", "DejaVu Sans", "Arial Unicode MS"])
         for row in range(8):
             rank_label = QLabel(str(8 - row))
+            self.rank_labels.append(rank_label)
             rank_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             rank_label.setFixedWidth(24)
             layout.addWidget(rank_label, row, 0)
             for file in range(8):
                 square = chess.square(file, 7 - row)
                 button = QPushButton()
-                button.setFont(font)
+                button.setIconSize(QSize(46, 46))
                 button.setMinimumSize(52, 52)
                 button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 button.clicked.connect(lambda checked=False, s=square: self.select_square(s))
@@ -46,11 +52,34 @@ class ChessBoard(QWidget):
             layout.setRowStretch(row, 1)
         for file in range(8):
             label = QLabel(chess.FILE_NAMES[file])
+            self.file_labels.append(label)
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             label.setFixedHeight(24)
             layout.addWidget(label, 8, file + 1)
             layout.setColumnStretch(file + 1, 1)
+        self.overlay = AttackOverlay(self, self.squares, lambda: self.game.position)
         self.refresh()
+
+    def set_orientation(self, color: chess.Color) -> None:
+        self.orientation = color
+        for square, button in self.squares.items():
+            row = 7 - chess.square_rank(square) if color else chess.square_rank(square)
+            column = chess.square_file(square) if color else 7 - chess.square_file(square)
+            self.board_layout.addWidget(button, row, column + 1)
+        for index in range(8):
+            self.rank_labels[index].setText(str(8 - index if color else index + 1))
+            self.file_labels[index].setText(chess.FILE_NAMES[index if color else 7 - index])
+        self.clear_selection()
+
+    def set_attacks_visible(self, visible: bool) -> None:
+        self.overlay.setGeometry(self.rect())
+        self.overlay.setVisible(visible)
+        self.overlay.raise_()
+        self.overlay.update()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self.overlay.setGeometry(self.rect())
 
     def clear_selection(self) -> None:
         self.selected_square = None
@@ -64,7 +93,7 @@ class ChessBoard(QWidget):
         )
         for square, button in self.squares.items():
             piece = self.game.piece_at(square)
-            button.setText(piece.unicode_symbol() if piece else "")
+            button.setIcon(piece_icon(piece.piece_type, piece.color) if piece else QIcon())
             name = chess.square_name(square)
             description = (
                 f"{'White' if piece.color else 'Black'} {chess.piece_name(piece.piece_type)}"
@@ -85,8 +114,13 @@ class ChessBoard(QWidget):
                 f" border: 3px solid {border}; border-radius: 0; padding: 0; }}"
                 "QPushButton:focus { border: 3px solid #305da8; }"
             )
+        self.overlay.raise_()
+        self.overlay.update()
 
     def select_square(self, square: chess.Square) -> None:
+        if not self.input_allowed:
+            self.message.emit("Start a match or wait for your turn.")
+            return
         if self.game.status().game_over:
             self.message.emit("Game over. Start a new game or undo a move.")
             return
