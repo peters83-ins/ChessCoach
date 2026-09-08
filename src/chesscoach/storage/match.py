@@ -7,7 +7,7 @@ from uuid import uuid4
 import chess
 
 from chesscoach.chess.game import Game
-from chesscoach.storage.database import GameData, GameDatabase
+from chesscoach.storage.database import GameData, GameDatabase, SaveResult
 
 
 def utc_now() -> str:
@@ -33,7 +33,7 @@ class BotMatch:
         else:
             self.ended_at = None
 
-    def save(self, database: GameDatabase) -> str:
+    def save(self, database: GameDatabase) -> SaveResult:
         self.record_position()
         return database.save_game(
             GameData.from_game(

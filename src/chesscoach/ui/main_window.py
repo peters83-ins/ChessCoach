@@ -1,6 +1,5 @@
 """Match setup, human/engine turns, and explicit persistence feedback."""
 
-import sqlite3
 from pathlib import Path
 
 import chess
@@ -48,7 +47,7 @@ class MainWindow(QMainWindow):
             QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
         )
         self.database = (
-            database if database is not None else GameDatabase(data_dir / "games.sqlite3")
+            database if database is not None else GameDatabase(data_dir / "games" / "games.sqlite3")
         )
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
@@ -231,12 +230,11 @@ class MainWindow(QMainWindow):
     def save_match(self) -> bool:
         if self.match is None or not self.game.history():
             return True
-        try:
-            self.match.save(self.database)
-        except (OSError, sqlite3.Error, ValueError) as error:
-            self.statusBar().showMessage(f"Could not save match: {error}. Use Save Match to retry.")
+        result = self.match.save(self.database)
+        if not result.success:
+            self.statusBar().showMessage(f"Save failed: {result.error}")
             return False
-        self.statusBar().showMessage(f"Match saved to {self.database.path}")
+        self.statusBar().showMessage("Game saved.")
         return True
 
     def new_game(self) -> None:
