@@ -105,8 +105,13 @@ class MainWindow(QMainWindow):
         self.save_button.clicked.connect(self.save_match)
         self.retry_button.clicked.connect(self.request_engine)
         self.board.game_changed.connect(self.position_changed)
-        self.board.message.connect(self.statusBar().showMessage)
+        self.board.message.connect(self.show_board_message)
         self.refresh()
+
+    def show_board_message(self, message: str) -> None:
+        self.statusBar().showMessage(message)
+        if not self.active:
+            self.status_label.setText(message)
 
     def refresh(self) -> None:
         status = self.game.status()
@@ -116,6 +121,12 @@ class MainWindow(QMainWindow):
         self.history.set_moves(self.game.history())
         human_turn = self.match is None or self.game.turn == self.match.player_color
         self.board.input_allowed = self.active and human_turn
+        self.board.preview_only = not self.active
+        self.board.input_message = (
+            "Preview only. Click Start Match to play, or choose Local two-player without an engine."
+            if not self.active
+            else "Wait for the computer to move."
+        )
         can_undo = self.game.can_undo
         if self.match is not None:
             can_undo = not status.game_over and len(self.game.history()) > (
@@ -203,7 +214,12 @@ class MainWindow(QMainWindow):
             self.game.position.san(result.analysis.best_move) if result.analysis.best_move else "—"
         )
         self.engine_label.setText(
-            f"White eval: {evaluation} · Best: {best}\nBot target: ~{result.actual_elo} Elo"
+            f"White eval: {evaluation} · Best: {best}\nBot: ~{result.actual_elo} "
+            + (
+                "practice level (uncalibrated)"
+                if result.actual_elo in (800, 1000, 1200)
+                else "Elo target"
+            )
         )
         self.refresh()
 
