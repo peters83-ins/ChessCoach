@@ -119,8 +119,10 @@ The Python persistence API is `GameDatabase(path).save_game(game_data)`, accepti
 validated `GameData`; it returns a `SaveResult` with a `success` boolean and a short
 error on failure. Validation requires moves, matching timestamps, player color,
 and positive bot difficulty. `BotMatch.save(database)` builds the record.
-Use **Load Saved Game** to choose a match by date, player color, bot difficulty,
-result, and move count. Loading opens a read-only analysis view at the final move.
+Use **Games** or **Load Saved Game** to search, filter, and sort matches by date,
+result, color, difficulty, opening, and analysis state. The library shows practice
+counts and supports confirmed deletion and PGN export. Loading opens a read-only
+analysis view at the final move.
 Use the first, previous, next, last, and slider controls to visit any ply. The board
 shows the selected position, with the played move in blue and Stockfish's best move
 in purple. The details panel shows both moves in SAN and the evaluation before the
@@ -151,7 +153,8 @@ application and pytest launch configurations.
 ```text
 src/chesscoach/
   main.py, config.py       Launch and environment configuration
-  chess/                  Game rules, PGN, geometric attack queries
+  preferences.py          Persistent display, review, and analysis choices
+  chess/                  Game rules, PGN, opening recognition, attack queries
   engine/
     analysis.py           Evaluation and candidate-line contracts
     stockfish.py          Local UCI adapter and difficulty control
@@ -166,6 +169,7 @@ src/chesscoach/
     evaluation_bar.py     Graphical White/Black engine evaluation
     game_review.py        Saved-game navigation and engine comparison
     coach_panel.py         Full-game report, feedback, practice, and lessons
+    learning_center.py     Weakness dashboard and scheduled practice queue
     piece_assets.py       Cached SVG piece rendering
     attack_overlay.py     Toggleable, mouse-transparent arrows
     move_history.py       SAN table
@@ -206,6 +210,16 @@ particular review with **Use OpenAI for critical-move explanations**.
 Only selected positions, legal moves, engine lines, classifications, and extracted
 evidence are sent; full PGNs and API keys are not stored or transmitted by the
 coaching pipeline. Invalid or unavailable AI output falls back to local feedback.
+Cloud requests batch a few critical positions, cap principal variations and output,
+and reuse cached feedback to limit token use.
+
+The navigation toolbar provides **Play**, **Games**, **Review**, **Practice**,
+**Lessons**, and **Settings**. The weakness dashboard links each inferred theme and
+its engine evidence to saved examples. Practice schedules personal positions,
+automatically plays forced replies, and records later success against the same theme.
+Lessons resume at the last step and link back to verified practice. Settings persist
+board orientation and contrast, piece and text size, review perspective, best-move
+visibility, coaching detail, and Quick/Standard/Deep analysis depth.
 See [AI coach architecture](docs/AI_COACH.md) for scoring and extension contracts.
 The prioritized [first-pass product backlog](docs/FIRST_PASS_BACKLOG.md) is the working
 reference for onboarding, review navigation, practice, lessons, and release readiness.
