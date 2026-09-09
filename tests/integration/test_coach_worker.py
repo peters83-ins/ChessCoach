@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from threading import Event
 
@@ -99,7 +100,7 @@ def test_coach_runner_persists_completed_background_job(
     assert progress.count() >= 2
     assert result.count() == 1
     assert result.at(0)[0].analysis == expected
-    with sqlite3.connect(repository.path) as connection:
+    with closing(sqlite3.connect(repository.path)) as connection:
         state = connection.execute("SELECT state FROM analysis_runs").fetchone()[0]
     assert state == "complete"
 
@@ -160,6 +161,6 @@ def test_coach_worker_redacts_secret_from_failure(
     app.processEvents()
     assert errors.count() == 1
     assert secret not in errors.at(0)[0]
-    with sqlite3.connect(repository.path) as connection:
+    with closing(sqlite3.connect(repository.path)) as connection:
         stored = connection.execute("SELECT error FROM analysis_runs").fetchone()[0]
     assert secret not in stored
