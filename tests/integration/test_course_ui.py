@@ -46,6 +46,8 @@ def test_course_library_filters_and_player_starts(app: QApplication, tmp_path: P
     library = CourseLibraryDialog(catalog(), repository)
     assert library.list.count() == 1
     assert library.filter_summary.text() == "Showing 1 of 1 courses"
+    assert library.query.accessibleName() == "Search courses"
+    assert library.side.accessibleName() == "Filter courses by side"
     library.query.setText("missing")
     assert library.list.count() == 0
     assert library.filter_summary.text() == "Showing 0 of 1 courses"
@@ -53,5 +55,8 @@ def test_course_library_filters_and_player_starts(app: QApplication, tmp_path: P
     assert library.list.count() == 1
     player = CoursePlayerDialog(catalog().courses[0], repository)
     assert player.status.text().startswith("Your move")
+    assert player.board.accessibleName() == "Course exercise chess board"
+    assert player.hint.accessibleName() == "Show progressive course hint"
+    assert ": Black rook" in player.board.squares[next(iter(player.board.squares))].accessibleName()
     player.close()
     library.close()

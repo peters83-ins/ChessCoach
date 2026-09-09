@@ -49,6 +49,8 @@ class ChessBoard(QWidget):
             for file in range(8):
                 square = chess.square(file, 7 - row)
                 button = QPushButton()
+                button.setAccessibleName(f"Chess square {chess.square_name(square)}")
+                button.setAccessibleDescription("Select this square or move a piece here")
                 button.setIconSize(QSize(46, 46))
                 button.setMinimumSize(52, 52)
                 button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
