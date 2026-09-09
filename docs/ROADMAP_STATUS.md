@@ -30,8 +30,8 @@ active development queue.
   theme success before and after practice when each side has five observations;
   opening departure now compares reviewed-line coverage in recent and earlier games;
   game-phase transfer compares analyzed moves when each phase has enough data.
-- Link theme insights to supporting game positions through the review action; extend
-  links to exercises and course decisions as those views gain evidence records.
+- Link theme insights to supporting game positions through review and directly open
+  themed practice from the Insights panel. Course-decision links remain future work.
   Recommend one ranked next action and label metrics as project-specific Chess Coach
   estimates.
 - Add unit tests for aggregation, sample thresholds, recency weighting, transfer
