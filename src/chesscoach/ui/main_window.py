@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QScrollArea,
+    QStackedWidget,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -137,6 +138,8 @@ class MainWindow(QMainWindow):
         self.courses_action.setToolTip("Reviewed offline opening courses")
         self.learn_action.setToolTip("Your recommended next learning activity")
         self.settings_action = QAction("Settings", self)
+        self.back_action = QAction("Back", self)
+        self.back_action.setShortcut(QKeySequence("Alt+Left"))
         self.play_action.setShortcut(QKeySequence.StandardKey.New)
         self.games_action.setShortcut(QKeySequence.StandardKey.Open)
         self.review_action.setShortcut(QKeySequence("Ctrl+R"))
@@ -156,6 +159,7 @@ class MainWindow(QMainWindow):
             self.learn_action,
             self.insights_action,
             self.settings_action,
+            self.back_action,
         ):
             navigation.addAction(action)
         central = QWidget()
@@ -178,7 +182,9 @@ class MainWindow(QMainWindow):
         sidebar_scroll.setFrameShape(QFrame.Shape.NoFrame)
         sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         sidebar_scroll.setWidget(sidebar_container)
-        layout.addWidget(sidebar_scroll, 1)
+        self.workspace_stack = QStackedWidget()
+        self.workspace_stack.addWidget(sidebar_scroll)
+        layout.addWidget(self.workspace_stack, 1)
         title = QLabel("Chess Coach")
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
         sidebar.addWidget(title)
@@ -273,6 +279,7 @@ class MainWindow(QMainWindow):
         self.learn_action.triggered.connect(self.open_learning_home)
         self.insights_action.triggered.connect(self.open_insights)
         self.settings_action.triggered.connect(self.open_settings)
+        self.back_action.triggered.connect(self.show_play_workspace)
         self.apply_preferences(self.preferences)
         self.refresh()
 
@@ -989,6 +996,10 @@ class MainWindow(QMainWindow):
             lambda: PracticeQueueDialog(self.coach_repository, self, self.course_catalog),
         )
 
+    def show_play_workspace(self) -> None:
+        self.workspace_stack.setCurrentIndex(0)
+        self.statusBar().showMessage("Play workspace", 2000)
+
     def open_lessons(self) -> None:
         lessons = self.coach_repository.lessons()
         if not lessons:
@@ -1055,6 +1066,10 @@ class MainWindow(QMainWindow):
             return
         dialog = factory()
         self.destination_dialogs[key] = dialog
+        dialog.setParent(self.workspace_stack)
+        dialog.setWindowFlags(Qt.WindowType.Widget)
+        self.workspace_stack.addWidget(dialog)
+        self.workspace_stack.setCurrentWidget(dialog)
         dialog.show()
         dialog.raise_()
         dialog.activateWindow()
