@@ -51,6 +51,29 @@ def recency_weighted_average(
     return weighted / total if total else 0.0
 
 
+def period_comparison(
+    values: Iterable[tuple[float, datetime]],
+    *,
+    now: datetime | None = None,
+    recent_days: int = 45,
+    minimum: int = 3,
+) -> tuple[float, float] | None:
+    """Return weighted recent and prior averages once both periods have data."""
+    current = now or datetime.now(UTC)
+    recent: list[tuple[float, datetime]] = []
+    prior: list[float] = []
+    for value, observed in values:
+        age_days = (current - observed).total_seconds() / 86400
+        if 0 <= age_days <= recent_days:
+            recent.append((value, observed))
+        elif age_days > recent_days:
+            prior.append(value)
+    if len(recent) < minimum or len(prior) < minimum:
+        return None
+    recent_average = recency_weighted_average(recent, current)
+    return recent_average, sum(prior) / len(prior)
+
+
 def recommend_next_action(due_reviews: int, weakest_theme: str, games: int) -> str:
     """Rank one actionable next step instead of presenting an unranked dashboard."""
     if due_reviews:

@@ -4,6 +4,7 @@ from chesscoach.chess.openings import OpeningMatch
 from chesscoach.coach.insights import (
     analyzed_theme_counts,
     opening_stats,
+    period_comparison,
     phase_accuracy,
     recency_weighted_average,
     recommend_next_action,
@@ -24,6 +25,16 @@ def test_recency_weights_recent_results_more():
     now = datetime(2026, 1, 31, tzinfo=UTC)
     result = recency_weighted_average(((100.0, now), (0.0, now - timedelta(days=90))), now)
     assert result > 50
+
+
+def test_period_comparison_requires_both_periods_and_weights_recent():
+    now = datetime(2026, 1, 31, tzinfo=UTC)
+    values = tuple((1.0, now - timedelta(days=days)) for days in (1, 10, 30, 60, 90, 120))
+    comparison = period_comparison(values, now=now)
+    assert comparison is not None
+    recent, prior = comparison
+    assert recent == 1.0 and prior == 1.0
+    assert period_comparison(values[:4], now=now) is None
 
 
 def test_recommendation_prioritizes_due_then_weakness():
