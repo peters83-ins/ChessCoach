@@ -17,6 +17,12 @@ def test_daily_queue_includes_due_course_decisions(app: QApplication, tmp_path: 
     assert queue.table.item(0, 0).text() == "Course"
     queue.close()
 
+    themed = PracticeQueueDialog(
+        repository, catalog=catalog, initial_theme="development"
+    )
+    assert themed.theme_filter.currentData() == "development"
+    themed.close()
+
 
 def test_daily_queue_filters_and_reports_empty_filtered_session(
     app: QApplication, tmp_path: Path

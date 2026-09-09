@@ -1014,7 +1014,16 @@ class MainWindow(QMainWindow):
             self.coach_repository, self.database, self.course_catalog, self
         )
         dialog.example_requested.connect(self.open_game_example)
+        dialog.theme_practice_requested.connect(self.open_practice_theme)
         return dialog
+
+    def open_practice_theme(self, theme: str) -> None:
+        self._show_destination(
+            "practice",
+            lambda: PracticeQueueDialog(
+                self.coach_repository, self, self.course_catalog, initial_theme=theme
+            ),
+        )
 
     def _make_learning_home(self) -> LearningHomeDialog:
         dialog = LearningHomeDialog(self.coach_repository, self.course_catalog, self.database, self)
