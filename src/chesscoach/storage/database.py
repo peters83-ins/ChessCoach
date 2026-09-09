@@ -138,6 +138,11 @@ class GameDatabase:
         games: dict[str, SavedGameSummary] = {}
         for path in reversed(self._read_paths()):
             with closing(sqlite3.connect(path, timeout=2.0)) as connection:
+                table = connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='games'"
+                ).fetchone()
+                if table is None:
+                    continue
                 rows = connection.execute(
                     "SELECT id, saved_at, player_color, bot_elo, result, data_json "
                     "FROM games ORDER BY saved_at DESC"
