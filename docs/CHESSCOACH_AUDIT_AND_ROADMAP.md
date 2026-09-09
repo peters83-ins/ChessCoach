@@ -80,14 +80,13 @@ visual identity, reviewed offline content, and local-first data model.
 
 ### Stage 2 — Shared navigation shell
 
-- A shared workspace stack now hosts modeless Learn, Courses, Practice, Lessons,
-  Insights, and related destinations, with a Back action returning to Play.
-- Replace remaining destination-blocking dialogs with one central workspace for Play,
-  Games, Review, Practice, Learn, Lessons, Courses, Insights, and Settings.
+- A shared workspace stack now hosts Learn, Courses, Practice, Lessons, Insights,
+  Games, Settings, Diagnostics, and Review, with a Back action returning to Play.
+- Focused exercises, confirmations, and setup prompts remain dialogs.
 - Keep focused exercises, confirmations, and setup prompts as dialogs.
 - Preserve one active destination, back/forward behavior, keyboard navigation, and
   unsaved-work handling.
-- Add rapid-switching and repeated-click GUI tests.
+- Add rapid-switching and repeated-click GUI tests (initial coverage is in place).
 
 ### Stage 3 — Review and learning parity
 
