@@ -45,8 +45,10 @@ def test_course_library_filters_and_player_starts(app: QApplication, tmp_path: P
     repository = CoachRepository(tmp_path / "coach.sqlite3")
     library = CourseLibraryDialog(catalog(), repository)
     assert library.list.count() == 1
+    assert library.filter_summary.text() == "Showing 1 of 1 courses"
     library.query.setText("missing")
     assert library.list.count() == 0
+    assert library.filter_summary.text() == "Showing 0 of 1 courses"
     library.query.setText("demo")
     assert library.list.count() == 1
     player = CoursePlayerDialog(catalog().courses[0], repository)

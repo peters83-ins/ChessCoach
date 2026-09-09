@@ -35,6 +35,12 @@ class CourseLibraryDialog(QDialog):
         self.setWindowTitle("Course library")
         self.resize(620, 420)
         layout = QVBoxLayout(self)
+        intro = QLabel(
+            "Courses are reviewed opening paths with board exercises. Personalized Lessons "
+            "are generated from your analyzed games."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
         filters = QHBoxLayout()
         self.search = QLabel("Search")
         filters.addWidget(self.search)
@@ -53,6 +59,8 @@ class CourseLibraryDialog(QDialog):
         self.level.setPrefix("Rating ")
         filters.addWidget(self.level)
         layout.addLayout(filters)
+        self.filter_summary = QLabel()
+        layout.addWidget(self.filter_summary)
         self.list = QListWidget()
         self.list.setAccessibleName("Course list")
         layout.addWidget(self.list, 1)
@@ -77,6 +85,9 @@ class CourseLibraryDialog(QDialog):
             side = "all"
         level = self.level.value() or None
         courses = self.catalog.search(self.query.text(), side, level)
+        self.filter_summary.setText(
+            f"Showing {len(courses)} of {len(self.catalog.courses)} courses"
+        )
         self.list.clear()
         for course in courses:
             item = QListWidgetItem(
