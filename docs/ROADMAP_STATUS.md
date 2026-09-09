@@ -40,7 +40,7 @@ active development queue.
 - Replace the remaining destination dialogs with a shared content area where practical;
   keep focused exercises and confirmations as dialogs.
 - Add a visible session completion state and theme/previously-failed filters to daily
-  practice.
+  practice (implemented in the Practice Queue; failed-item IDs are stored locally).
 - Improve keyboard navigation across course controls and verify screen-reader labels
   in a native Windows pass.
 
