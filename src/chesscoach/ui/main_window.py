@@ -1015,7 +1015,23 @@ class MainWindow(QMainWindow):
         )
         dialog.example_requested.connect(self.open_game_example)
         dialog.theme_practice_requested.connect(self.open_practice_theme)
+        dialog.theme_course_requested.connect(self.open_course_theme)
         return dialog
+
+    def open_course_theme(self, theme: str) -> None:
+        course = next(
+            (
+                course
+                for course in self.course_catalog.courses
+                if any(theme in exercise.tags for exercise in course.exercises)
+            ),
+            None,
+        )
+        if course is not None:
+            self._show_destination(
+                f"course:{course.id}",
+                lambda: CourseDetailDialog(course, self.coach_repository, self),
+            )
 
     def open_practice_theme(self, theme: str) -> None:
         self._show_destination(
