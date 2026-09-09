@@ -36,8 +36,10 @@ class LearningHomeDialog(QDialog):
         self.weakest = QPushButton("Study weakest theme")
         self.course_library = QPushButton("Browse courses")
         for button, action in (
-            (self.continue_course, "courses"), (self.practice_due, "practice"),
-            (self.review_latest, "latest"), (self.weakest, "weaknesses"),
+            (self.continue_course, "continue"),
+            (self.practice_due, "practice"),
+            (self.review_latest, "latest"),
+            (self.weakest, "weaknesses"),
             (self.course_library, "courses"),
         ):
             button.clicked.connect(lambda checked=False, value=action: self._choose(value))
@@ -85,5 +87,15 @@ class LearningHomeDialog(QDialog):
             )
 
     def _choose(self, action: str) -> None:
+        if action == "continue":
+            progress = self.repository.course_progress()
+            if progress:
+                self.action_requested.emit(f"course:{progress[0].course_id}")
+            elif self.catalog.courses:
+                self.action_requested.emit(f"course:{self.catalog.courses[0].id}")
+            else:
+                self.action_requested.emit("courses")
+            self.accept()
+            return
         self.action_requested.emit(action)
         self.accept()

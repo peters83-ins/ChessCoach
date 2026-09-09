@@ -40,7 +40,7 @@ from chesscoach.storage.database import GameData, GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
 from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog
-from chesscoach.ui.course_center import CourseLibraryDialog
+from chesscoach.ui.course_center import CourseDetailDialog, CourseLibraryDialog
 from chesscoach.ui.diagnostics import DiagnosticInfo, DiagnosticsDialog
 from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.first_run import FirstRunWizard
@@ -983,9 +983,7 @@ class MainWindow(QMainWindow):
         CourseLibraryDialog(self.course_catalog, self.coach_repository, self).exec()
 
     def open_learning_home(self) -> None:
-        dialog = LearningHomeDialog(
-            self.coach_repository, self.course_catalog, self.database, self
-        )
+        dialog = LearningHomeDialog(self.coach_repository, self.course_catalog, self.database, self)
         dialog.action_requested.connect(self._learning_action)
         dialog.exec()
 
@@ -994,6 +992,13 @@ class MainWindow(QMainWindow):
             self.open_practice()
         elif action == "courses":
             self.open_courses()
+        elif action.startswith("course:"):
+            course_id = action.removeprefix("course:")
+            course = next(
+                (value for value in self.course_catalog.courses if value.id == course_id), None
+            )
+            if course is not None:
+                CourseDetailDialog(course, self.coach_repository, self).exec()
         elif action == "weaknesses":
             self.open_weaknesses()
         elif action == "latest":

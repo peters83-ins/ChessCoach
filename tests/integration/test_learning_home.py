@@ -17,5 +17,5 @@ def test_learning_home_empty_state_and_course_action(app: QApplication, tmp_path
     assert dialog.continue_course.isEnabled()
     chosen: list[str] = []
     dialog.action_requested.connect(chosen.append)
-    dialog.course_library.click()
-    assert chosen == ["courses"]
+    dialog.continue_course.click()
+    assert chosen == ["course:italian-game-white"]
