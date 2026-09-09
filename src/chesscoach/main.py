@@ -2,6 +2,7 @@
 
 import sys
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from chesscoach.ui.main_window import MainWindow
@@ -9,9 +10,11 @@ from chesscoach.ui.main_window import MainWindow
 
 def main() -> int:
     app = QApplication(sys.argv)
+    app.setOrganizationName("ChessCoach")
     app.setApplicationName("Chess Coach")
     window = MainWindow()
     window.show()
+    QTimer.singleShot(0, window.maybe_show_first_run)
     return app.exec()
 
 

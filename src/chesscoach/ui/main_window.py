@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 import chess
-from PySide6.QtCore import QStandardPaths, Qt, QTimer
+from PySide6.QtCore import QSettings, QStandardPaths, Qt, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
@@ -36,10 +36,12 @@ from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
 from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog, PracticeDialog
 from chesscoach.ui.evaluation_bar import EvaluationBar
+from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.game_review import GameReview
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import MoveHistory
 from chesscoach.ui.saved_games import SavedGamesDialog
+from chesscoach.ui.settings_dialog import SettingsDialog
 
 
 class MainWindow(QMainWindow):
@@ -82,6 +84,7 @@ class MainWindow(QMainWindow):
         self.coach_runner.result.connect(self.coach_result)
         self.coach_runner.error.connect(self.coach_error)
         self.coach_settings = Settings.from_environment(Path(".env"))
+        self.first_run_wizard: FirstRunWizard | None = None
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
         central = QWidget()
@@ -154,6 +157,7 @@ class MainWindow(QMainWindow):
         self.save_button.setToolTip(str(self.database.path))
         self.load_button = QPushButton("Load Saved Game")
         self.retry_button = QPushButton("Retry Engine")
+        self.settings_button = QPushButton("Settings")
         for button in (
             self.new_game_button,
             self.undo_button,
@@ -162,6 +166,7 @@ class MainWindow(QMainWindow):
             self.save_button,
             self.load_button,
             self.retry_button,
+            self.settings_button,
         ):
             sidebar.addWidget(button)
         self.new_game_button.clicked.connect(self.new_game)
@@ -171,6 +176,7 @@ class MainWindow(QMainWindow):
         self.save_button.clicked.connect(self.save_match)
         self.load_button.clicked.connect(self.load_saved_game)
         self.retry_button.clicked.connect(self.retry_engine)
+        self.settings_button.clicked.connect(self.open_settings)
         self.board.game_changed.connect(self.position_changed)
         self.board.message.connect(self.show_board_message)
         self.refresh()
@@ -179,6 +185,29 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(message)
         if not self.active and not self.review_details:
             self.status_label.setText(message)
+
+    def maybe_show_first_run(self) -> None:
+        if not QSettings().value("setup/complete", False, bool):
+            self.open_first_run()
+
+    def open_first_run(self) -> None:
+        wizard = FirstRunWizard(self.coach_settings, self.database.path, parent=self)
+        wizard.settings_saved.connect(self.apply_settings)
+        wizard.finished.connect(lambda: setattr(self, "first_run_wizard", None))
+        self.first_run_wizard = wizard
+        wizard.open()
+
+    def open_settings(self) -> None:
+        dialog = SettingsDialog(self.coach_settings, parent=self)
+        dialog.settings_saved.connect(self.apply_settings)
+        dialog.exec()
+
+    def apply_settings(self, settings: Settings) -> None:
+        self.coach_settings = settings
+        if settings.stockfish_path:
+            self.setup.engine_path.setText(settings.stockfish_path)
+        self.coach_panel.set_ai_ready(bool(settings.openai_api_key and settings.openai_model))
+        self.statusBar().showMessage("Settings saved locally.", 4000)
 
     def refresh(self) -> None:
         status = self.game.status()
@@ -506,11 +535,12 @@ class MainWindow(QMainWindow):
         self.review_timer.stop()
         self.coach_running = True
         self.coach_panel.set_running(True)
+        settings = self.coach_settings if self.coach_panel.use_cloud else Settings()
         self.coach_runner.start(
             self.review.data,
             path,
             self.coach_repository,
-            self.coach_settings,
+            settings,
         )
 
     def coach_progress(self, progress: AnalysisProgress) -> None:

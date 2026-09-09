@@ -3,6 +3,7 @@
 import chess
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QHBoxLayout,
@@ -45,6 +46,12 @@ class CoachPanel(QWidget):
         self.ai_status = QLabel("Local coach available")
         self.ai_status.setWordWrap(True)
         layout.addWidget(self.ai_status)
+        self.cloud_toggle = QCheckBox("Use OpenAI for critical-move explanations")
+        self.cloud_toggle.setEnabled(False)
+        self.cloud_toggle.setToolTip(
+            "Sends selected positions and engine facts, not the full game or API key."
+        )
+        layout.addWidget(self.cloud_toggle)
         self.filter = QComboBox()
         self.filter.addItem("My moves", "player")
         self.filter.addItem("Mistakes and blunders", "critical")
@@ -71,11 +78,18 @@ class CoachPanel(QWidget):
         self.filter.currentIndexChanged.connect(lambda: self.show_ply(self.current_ply))
 
     def set_ai_ready(self, ready: bool) -> None:
+        self.cloud_toggle.setEnabled(ready)
+        if not ready:
+            self.cloud_toggle.setChecked(False)
         self.ai_status.setText(
             "OpenAI explanations enabled; engine facts remain authoritative."
             if ready
             else "Local coach active. Set OPENAI_API_KEY and OPENAI_MODEL for AI wording."
         )
+
+    @property
+    def use_cloud(self) -> bool:
+        return self.cloud_toggle.isEnabled() and self.cloud_toggle.isChecked()
 
     def clear(self) -> None:
         self.bundle = None
