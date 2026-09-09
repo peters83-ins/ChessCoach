@@ -427,6 +427,18 @@ class CoachRepository:
             rows = connection.execute(query, params).fetchall()
         return tuple(_move_from_dict(json.loads(row[0])) for row in rows)
 
+    def stored_move_analyses_by_game(self) -> tuple[tuple[str, MoveAnalysis], ...]:
+        """Return complete persisted analyses with their source game IDs."""
+        if not self.path.is_file():
+            return ()
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(
+                "SELECT ar.game_id, ma.data_json FROM move_analyses ma "
+                "JOIN analysis_runs ar ON ar.id=ma.run_id WHERE ar.state='complete'"
+            ).fetchall()
+        return tuple((str(game_id), _move_from_dict(json.loads(data))) for game_id, data in rows)
+
     def get_move_analysis(self, key: str) -> MoveAnalysis | None:
         if not self.path.is_file():
             return None

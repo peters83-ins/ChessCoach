@@ -6,6 +6,7 @@ from chesscoach.coach.insights import (
     opening_stats,
     period_comparison,
     phase_accuracy,
+    phase_transfer,
     recency_weighted_average,
     recommend_next_action,
     theme_frequency,
@@ -72,3 +73,13 @@ def test_phase_and_analyzed_theme_aggregations():
     )
     assert phase_accuracy((move,), "white") == (("opening", 90, 1),)
     assert analyzed_theme_counts((move,)) == (("development", 1),)
+
+
+def test_phase_transfer_requires_recent_and_prior_samples():
+    now = datetime(2026, 1, 31, tzinfo=UTC)
+    records = tuple(
+        [("opening", 90.0, now - timedelta(days=days)) for days in (1, 2, 3)]
+        + [("opening", 60.0, now - timedelta(days=60 + days)) for days in (1, 2, 3)]
+    )
+    result = phase_transfer(records, now=now)
+    assert result == (("opening", 90.0, 60.0, 6),)
