@@ -63,6 +63,7 @@ class CourseCatalog:
                 estimated_minutes=int(raw.get("estimated_minutes", 0)),
                 modules=modules,
                 exercises=exercises,
+                attribution=str(raw.get("attribution", "")),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError(f"Invalid course fields: {exc}") from exc

@@ -1,1 +1,651 @@
-{"schema_version":1,"courses":[]}
+{
+  "schema_version": 1,
+  "courses": [
+    {
+      "id": "italian-game-white",
+      "version": 1,
+      "title": "Italian Game for White",
+      "description": "A practical route to quick development, pressure on f7, and a later d4 break.",
+      "level_min": 600,
+      "level_max": 1400,
+      "side": "white",
+      "estimated_minutes": 20,
+      "attribution": "Original Chess Coach curriculum; opening ideas reviewed against standard public chess references.",
+      "modules": [
+        {
+          "id": "italian-foundations",
+          "title": "Foundations",
+          "summary": "Claim the center and develop with tempo.",
+          "order": 0,
+          "exercise_ids": [
+            "italian-1",
+            "italian-2"
+          ]
+        },
+        {
+          "id": "italian-development",
+          "title": "Development",
+          "summary": "Bring out the knights and bishops before hunting pawns.",
+          "order": 1,
+          "exercise_ids": [
+            "italian-3",
+            "italian-4"
+          ]
+        },
+        {
+          "id": "italian-plans",
+          "title": "Plans",
+          "summary": "Choose between d3 and the central d4 break.",
+          "order": 2,
+          "exercise_ids": [
+            "italian-5",
+            "italian-6"
+          ]
+        },
+        {
+          "id": "italian-tactics",
+          "title": "Tactical checkpoints",
+          "summary": "Use development and the f7 target to create threats.",
+          "order": 3,
+          "exercise_ids": [
+            "italian-7",
+            "italian-8"
+          ]
+        }
+      ],
+      "exercises": [
+        {
+          "id": "italian-1",
+          "module_id": "italian-foundations",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "learner_color": "white",
+          "line": [
+            "e2e4",
+            "e7e5"
+          ],
+          "prompt": "Start with a central pawn.",
+          "hints": [
+            "Open lines for your bishops."
+          ],
+          "explanation": "1.e4 claims central space and prepares rapid development.",
+          "tags": [
+            "center"
+          ]
+        },
+        {
+          "id": "italian-2",
+          "module_id": "italian-foundations",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "learner_color": "white",
+          "line": [
+            "e2e4",
+            "e7e5",
+            "g1f3"
+          ],
+          "prompt": "Develop the king knight.",
+          "hints": [
+            "Attack the e5 pawn while developing."
+          ],
+          "explanation": "The knight develops with tempo and supports the center.",
+          "tags": [
+            "development"
+          ]
+        },
+        {
+          "id": "italian-3",
+          "module_id": "italian-development",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "learner_color": "white",
+          "line": [
+            "e2e4",
+            "e7e5",
+            "f1c4"
+          ],
+          "prompt": "Place the bishop on its Italian square.",
+          "hints": [
+            "Look toward f7."
+          ],
+          "explanation": "Bc4 develops and points at the weakest square near the king.",
+          "tags": [
+            "f7",
+            "development"
+          ]
+        },
+        {
+          "id": "italian-4",
+          "module_id": "italian-development",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "learner_color": "white",
+          "line": [
+            "e2e4",
+            "e7e5",
+            "g1f3"
+          ],
+          "alternatives": [
+            [
+              "e2e4",
+              "e7e5",
+              "f1c4"
+            ]
+          ],
+          "prompt": "Choose development over an early queen move.",
+          "hints": [
+            "Knights before queens."
+          ],
+          "explanation": "Developing a piece keeps the initiative and prepares castling.",
+          "tags": [
+            "development"
+          ]
+        },
+        {
+          "id": "italian-5",
+          "module_id": "italian-plans",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "learner_color": "white",
+          "line": [
+            "e2e4",
+            "e7e5",
+            "d2d3"
+          ],
+          "prompt": "Choose a stable Italian structure.",
+          "hints": [
+            "Support e4 and keep the center flexible."
+          ],
+          "explanation": "d3 supports the center and leaves several useful plans.",
+          "tags": [
+            "plan",
+            "center"
+          ]
+        },
+        {
+          "id": "italian-6",
+          "module_id": "italian-plans",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "learner_color": "white",
+          "line": [
+            "e2e4",
+            "e7e5",
+            "g1f3"
+          ],
+          "prompt": "Keep the option of a central break.",
+          "hints": [
+            "Develop first; d4 is stronger when prepared."
+          ],
+          "explanation": "A prepared d4 can open the center while Black is still developing.",
+          "tags": [
+            "d4",
+            "center"
+          ]
+        },
+        {
+          "id": "italian-7",
+          "module_id": "italian-tactics",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "learner_color": "white",
+          "line": [
+            "e2e4",
+            "e7e5",
+            "f1c4"
+          ],
+          "prompt": "Create pressure on f7.",
+          "hints": [
+            "Coordinate bishop and queen only after developing."
+          ],
+          "explanation": "The bishop's diagonal makes f7 a recurring tactical target.",
+          "tags": [
+            "f7",
+            "pin"
+          ]
+        },
+        {
+          "id": "italian-8",
+          "module_id": "italian-tactics",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "learner_color": "white",
+          "line": [
+            "e2e4",
+            "e7e5",
+            "g1f3"
+          ],
+          "prompt": "Finish the opening with king safety in mind.",
+          "hints": [
+            "Your next goal is to castle."
+          ],
+          "explanation": "Development makes castling safe and keeps tactical pressure.",
+          "tags": [
+            "king_safety"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caro-kann-black",
+      "version": 1,
+      "title": "Caro-Kann Defense against 1.e4",
+      "description": "Meet 1.e4 with a solid c6 and d5 structure, then develop the light-squared bishop.",
+      "level_min": 600,
+      "level_max": 1400,
+      "side": "black",
+      "estimated_minutes": 20,
+      "attribution": "Original Chess Coach curriculum; opening ideas reviewed against standard public chess references.",
+      "modules": [
+        {
+          "id": "caro-structure",
+          "title": "The structure",
+          "summary": "Build the c6 and d5 foundation.",
+          "order": 0,
+          "exercise_ids": [
+            "caro-1",
+            "caro-2"
+          ]
+        },
+        {
+          "id": "caro-advance",
+          "title": "Advance positions",
+          "summary": "Respond to e5 with a clear central plan.",
+          "order": 1,
+          "exercise_ids": [
+            "caro-3",
+            "caro-4"
+          ]
+        },
+        {
+          "id": "caro-development",
+          "title": "Bishop and king",
+          "summary": "Develop actively before closing the position.",
+          "order": 2,
+          "exercise_ids": [
+            "caro-5",
+            "caro-6"
+          ]
+        },
+        {
+          "id": "caro-tactics",
+          "title": "Breaks and tactics",
+          "summary": "Recognize when ...c5 or ...e5 challenges the center.",
+          "order": 3,
+          "exercise_ids": [
+            "caro-7",
+            "caro-8"
+          ]
+        }
+      ],
+      "exercises": [
+        {
+          "id": "caro-1",
+          "module_id": "caro-structure",
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "c7c6"
+          ],
+          "prompt": "Answer 1.e4 with the Caro-Kann move.",
+          "hints": [
+            "Prepare ...d5 without blocking the bishop."
+          ],
+          "explanation": "...c6 supports the d5 break and keeps the c8 bishop available.",
+          "tags": [
+            "opening"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "caro-2",
+          "module_id": "caro-structure",
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "c7c6",
+            "d2d4",
+            "d7d5"
+          ],
+          "prompt": "Complete the central challenge.",
+          "hints": [
+            "Strike the e4 pawn with ...d5."
+          ],
+          "explanation": "The two-pawn center gives Black a durable, flexible structure.",
+          "tags": [
+            "center"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "caro-3",
+          "module_id": "caro-advance",
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "c7c6",
+            "e4e5",
+            "d7d5"
+          ],
+          "prompt": "Challenge the Advance center.",
+          "hints": [
+            "Attack the base of the pawn chain."
+          ],
+          "explanation": "...d5 contests the center before White can build freely.",
+          "tags": [
+            "advance"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "caro-4",
+          "module_id": "caro-advance",
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "c7c6",
+            "e4e5",
+            "d7d5"
+          ],
+          "prompt": "Keep the position compact.",
+          "hints": [
+            "A sound break is more useful than a pawn chase."
+          ],
+          "explanation": "The Caro-Kann accepts space while preparing counterplay against it.",
+          "tags": [
+            "pawn_structure"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "caro-5",
+          "module_id": "caro-development",
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "c7c6",
+            "d2d4",
+            "d7d5"
+          ],
+          "prompt": "Develop the light-squared bishop actively.",
+          "hints": [
+            "Do not bury it behind e6 too early."
+          ],
+          "explanation": "The main benefit of ...c6 is an open diagonal for the bishop.",
+          "tags": [
+            "development"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "caro-6",
+          "module_id": "caro-development",
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "c7c6",
+            "g1f3",
+            "d7d5"
+          ],
+          "prompt": "Meet development with the central break.",
+          "hints": [
+            "Do not wait while White develops freely."
+          ],
+          "explanation": "...d5 is still timely against quieter White setups.",
+          "tags": [
+            "development",
+            "center"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "caro-7",
+          "module_id": "caro-tactics",
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "c7c6",
+            "d2d4",
+            "d7d5"
+          ],
+          "prompt": "Prepare a later ...c5 break.",
+          "hints": [
+            "Pressure the center before opening lines."
+          ],
+          "explanation": "...c5 is a thematic way to challenge a broad white center.",
+          "tags": [
+            "break"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "caro-8",
+          "module_id": "caro-tactics",
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "c7c6",
+            "d2d4",
+            "d7d5"
+          ],
+          "prompt": "Value structure over a speculative pawn grab.",
+          "hints": [
+            "Complete development and castle."
+          ],
+          "explanation": "The Caro-Kann rewards sound development and tactical patience.",
+          "tags": [
+            "king_safety"
+          ],
+          "alternatives": []
+        }
+      ]
+    },
+    {
+      "id": "queen-gambit-declined-black",
+      "version": 1,
+      "title": "Queen's Gambit Declined against 1.d4",
+      "description": "Build a reliable d5/e6 center, develop safely, and prepare pressure against c4.",
+      "level_min": 600,
+      "level_max": 1400,
+      "side": "black",
+      "estimated_minutes": 20,
+      "attribution": "Original Chess Coach curriculum; opening ideas reviewed against standard public chess references.",
+      "modules": [
+        {
+          "id": "qgd-center",
+          "title": "The center",
+          "summary": "Establish d5 and e6 without weakening the king.",
+          "order": 0,
+          "exercise_ids": [
+            "qgd-1",
+            "qgd-2"
+          ]
+        },
+        {
+          "id": "qgd-development",
+          "title": "Safe development",
+          "summary": "Develop pieces and prepare castling.",
+          "order": 1,
+          "exercise_ids": [
+            "qgd-3",
+            "qgd-4"
+          ]
+        },
+        {
+          "id": "qgd-pressure",
+          "title": "Pressure on c4",
+          "summary": "Challenge the queen-pawn center with measured play.",
+          "order": 2,
+          "exercise_ids": [
+            "qgd-5",
+            "qgd-6"
+          ]
+        },
+        {
+          "id": "qgd-plans",
+          "title": "Plans and tactics",
+          "summary": "Use breaks and pins to reach a playable middlegame.",
+          "order": 3,
+          "exercise_ids": [
+            "qgd-7",
+            "qgd-8"
+          ]
+        }
+      ],
+      "exercises": [
+        {
+          "id": "qgd-1",
+          "module_id": "qgd-center",
+          "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "d7d5"
+          ],
+          "prompt": "Match 1.d4 in the center.",
+          "hints": [
+            "Claim your own central space."
+          ],
+          "explanation": "...d5 establishes a sound base and contests White's plans.",
+          "tags": [
+            "center"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "qgd-2",
+          "module_id": "qgd-center",
+          "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "d7d5",
+            "c2c4",
+            "e7e6"
+          ],
+          "prompt": "Support the d5 pawn.",
+          "hints": [
+            "Build the QGD structure with ...e6."
+          ],
+          "explanation": "...e6 makes d5 durable and opens the dark-squared bishop.",
+          "tags": [
+            "pawn_structure"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "qgd-3",
+          "module_id": "qgd-development",
+          "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "d7d5",
+            "g1f3",
+            "e7e6"
+          ],
+          "prompt": "Develop with a safe structure.",
+          "hints": [
+            "Support the center before chasing pieces."
+          ],
+          "explanation": "The QGD prioritizes a stable center and coordinated development.",
+          "tags": [
+            "development"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "qgd-4",
+          "module_id": "qgd-development",
+          "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "d7d5",
+            "c2c4",
+            "e7e6"
+          ],
+          "prompt": "Prepare to castle.",
+          "hints": [
+            "Develop the kingside before a pawn hunt."
+          ],
+          "explanation": "King safety gives Black time to challenge the c4 center later.",
+          "tags": [
+            "king_safety"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "qgd-5",
+          "module_id": "qgd-pressure",
+          "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "d7d5",
+            "c2c4",
+            "e7e6"
+          ],
+          "prompt": "Keep pressure on the c4 center.",
+          "hints": [
+            "Your structure gives you a target, not a race."
+          ],
+          "explanation": "Black can develop and later use ...c5 or ...c6 against c4.",
+          "tags": [
+            "c4",
+            "plan"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "qgd-6",
+          "module_id": "qgd-pressure",
+          "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "d7d5",
+            "c2c4",
+            "e7e6"
+          ],
+          "prompt": "Choose a patient reply to the Queen's Gambit.",
+          "hints": [
+            "Decline the pawn and keep the center sound."
+          ],
+          "explanation": "The QGD accepts a little less space for a resilient position.",
+          "tags": [
+            "opening"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "qgd-7",
+          "module_id": "qgd-plans",
+          "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "d7d5",
+            "c2c4",
+            "e7e6"
+          ],
+          "prompt": "Look for the later ...c5 break.",
+          "hints": [
+            "Complete development before opening the center."
+          ],
+          "explanation": "...c5 is a thematic break when Black is ready to contest d4.",
+          "tags": [
+            "break"
+          ],
+          "alternatives": []
+        },
+        {
+          "id": "qgd-8",
+          "module_id": "qgd-plans",
+          "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "learner_color": "black",
+          "line": [
+            "d7d5",
+            "c2c4",
+            "e7e6"
+          ],
+          "prompt": "Avoid an early pin and finish development.",
+          "hints": [
+            "Safe king, then pressure."
+          ],
+          "explanation": "The classic plan values coordination before tactical operations.",
+          "tags": [
+            "development",
+            "pin"
+          ],
+          "alternatives": []
+        }
+      ]
+    }
+  ]
+}

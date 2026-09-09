@@ -38,6 +38,7 @@ class Course:
     estimated_minutes: int
     modules: tuple[CourseModule, ...]
     exercises: tuple[CourseExercise, ...]
+    attribution: str = ""
 
     def exercise(self, exercise_id: str) -> CourseExercise:
         for exercise in self.exercises:
