@@ -40,7 +40,7 @@ def generate_practice_items(
                 move.ply,
                 move.fen,
                 theme,
-                move.best_pv,
+                move.best_pv[:3],
                 move.alternative_moves,
                 due_at=now.isoformat(),
             )
