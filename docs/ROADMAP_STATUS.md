@@ -26,8 +26,9 @@ active development queue.
 - Require five qualifying games before showing opening win-rate conclusions.
 - Compare recent and previous periods with greater weight on recent games (implemented
   in the Insights panel; requires three games per period).
-- Measure transfer: opening departure, repeated tactical errors, delayed practice
-  success, and phase-accuracy changes after related lessons.
+- Measure transfer from persisted practice attempts: the Insights panel now reports
+  theme success before and after practice when each side has five observations;
+  opening departure and game-phase transfer remain future additions.
 - Link theme insights to supporting game positions through the review action; extend
   links to exercises and course decisions as those views gain evidence records.
   Recommend one ranked next action and label metrics as project-specific Chess Coach
