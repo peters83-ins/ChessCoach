@@ -116,5 +116,25 @@ def phase_accuracy(
     )
 
 
+def phase_transfer(
+    records: Iterable[tuple[str, float, datetime]],
+    *,
+    now: datetime | None = None,
+    minimum: int = 3,
+) -> tuple[tuple[str, float, float, int], ...]:
+    """Compare phase accuracy in recent versus earlier analyzed games."""
+    grouped: dict[str, tuple[list[float], list[float]]] = {}
+    current = now or datetime.now(UTC)
+    for phase, accuracy, observed in records:
+        recent, prior = grouped.setdefault(phase, ([], []))
+        age_days = (current - observed).total_seconds() / 86400
+        (recent if 0 <= age_days <= 45 else prior).append(accuracy)
+    return tuple(
+        (phase, sum(recent) / len(recent), sum(prior) / len(prior), len(recent) + len(prior))
+        for phase, (recent, prior) in sorted(grouped.items())
+        if len(recent) >= minimum and len(prior) >= minimum
+    )
+
+
 def analyzed_theme_counts(moves: Iterable[MoveAnalysis]) -> tuple[tuple[str, int], ...]:
     return theme_frequency(tag for move in moves for tag in move.tags)

@@ -20,6 +20,7 @@ from chesscoach.coach.insights import (
     opening_stats,
     period_comparison,
     phase_accuracy,
+    phase_transfer,
     recommend_next_action,
     theme_frequency,
     transfer_metric,
@@ -73,6 +74,9 @@ class InsightsDialog(QDialog):
         self.phases.setHorizontalHeaderLabels(("Phase", "Accuracy", "Moves"))
         self.phases.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.phases)
+        self.phase_transfer_label = QLabel()
+        self.phase_transfer_label.setWordWrap(True)
+        layout.addWidget(self.phase_transfer_label)
         self.transfer = QLabel()
         self.transfer.setWordWrap(True)
         layout.addWidget(self.transfer)
@@ -117,6 +121,32 @@ class InsightsDialog(QDialog):
         for row, (phase, accuracy, count) in enumerate(phases):
             for column, value in enumerate((phase.title(), f"{accuracy:.1f}%", str(count))):
                 self.phases.setItem(row, column, QTableWidgetItem(value))
+        game_dates = {game.id: game.saved_at for game in games}
+        phase_records = []
+        for game_id, move in self.repository.stored_move_analyses_by_game():
+            saved_at = game_dates.get(game_id)
+            if saved_at is None or move.mover != "white":
+                continue
+            try:
+                observed = datetime.fromisoformat(saved_at)
+            except ValueError:
+                continue
+            if observed.tzinfo is None:
+                observed = observed.replace(tzinfo=UTC)
+            phase_records.append((move.phase.value, move.accuracy, observed))
+        phase_changes = phase_transfer(phase_records)
+        self.phase_transfer_label.setText(
+            "Phase transfer: "
+            + "; ".join(
+                f"{phase.title()} {recent:.1f}% vs {prior:.1f}% earlier"
+                for phase, recent, prior, _ in phase_changes
+            )
+            if phase_changes
+            else (
+                "Phase transfer comparisons require three recent and three earlier "
+                "analyzed moves per phase."
+            )
+        )
         due = len(self.repository.due_course_mastery()) + self.repository.practice_progress().due
         theme = details[0].theme if details else ""
         self.mastery.setValue(self._mastery_percent())
