@@ -157,6 +157,7 @@ def test_weakness_dismissal_and_practice_progress(tmp_path: Path) -> None:
     bundle = CoachPipeline(repository).build(game, analysis)
     details = repository.weakness_details()
     assert details and details[0].examples[0] == (game.id, 1)
+    assert details[0].reason
     assert repository.practice_progress().due == len(bundle.practice)
     repository.dismiss_weakness(details[0].theme)
     assert details[0].theme not in {item.theme for item in repository.weakness_scores()}

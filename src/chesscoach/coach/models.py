@@ -171,6 +171,7 @@ class WeaknessDetail:
     confidence: float
     trend: str
     examples: tuple[tuple[str, int], ...]
+    reason: str = "Engine analysis repeatedly found this theme."
 
 
 @dataclass(frozen=True)

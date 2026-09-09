@@ -4,7 +4,7 @@ from pathlib import Path
 
 import chess
 import pytest
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QSettings, Signal
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from chesscoach.chess.pgn import parse_pgn
@@ -21,6 +21,7 @@ from chesscoach.coach.models import (
 )
 from chesscoach.coach.pipeline import CoachPipeline
 from chesscoach.engine.worker import EngineRunner
+from chesscoach.preferences import UserPreferences
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameData, GameDatabase
 from chesscoach.storage.match import BotMatch
@@ -113,6 +114,9 @@ def coach_window(
         database=database,
         runner=FakeEngineRunner(),
         coach_runner=coach_runner,
+        preference_settings=QSettings(
+            str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat
+        ),
     )
     window.setup.engine_path.setText("engine")
     window.show()
@@ -281,3 +285,36 @@ def test_learning_dashboards_and_lesson_resume(
     dialog.close()
     reopened = LessonsDialog(repository.lessons(), repository)
     assert reopened.step == 2
+
+
+def test_review_preferences_control_board_and_analysis(app: QApplication, tmp_path: Path) -> None:
+    store = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
+    preferences = UserPreferences(
+        board_orientation="black",
+        board_theme="high_contrast",
+        analysis_profile="quick",
+        review_perspective="both",
+        show_best_move=False,
+        coach_verbosity="concise",
+    )
+    preferences.save(store)
+    runner = FakeCoachRunner()
+    window = MainWindow(
+        database=GameDatabase(tmp_path / "games.sqlite3"),
+        runner=FakeEngineRunner(),
+        coach_runner=runner,
+        preference_settings=store,
+    )
+    window.setup.engine_path.setText("engine")
+    window.open_review(data())
+    window.coach_result(bundle())
+    window.set_review_index(1)
+
+    assert window.board.orientation == chess.BLACK
+    assert window.board.theme == "high_contrast"
+    assert window.board.best_highlight is None
+    assert window.coach_panel.filter.currentData() == "both"
+    assert "Line:" not in window.coach_panel.feedback.text()
+    window.start_coach_analysis()
+    assert runner.requests[-1][4].name == "quick"
+    window.close()

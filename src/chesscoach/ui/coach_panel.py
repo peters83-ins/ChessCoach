@@ -38,6 +38,7 @@ class CoachPanel(QWidget):
         self.bundle: CoachBundle | None = None
         self.player_color = "white"
         self.current_ply = 0
+        self.verbosity = "detailed"
         self.opening_summary = "Opening: not identified"
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -88,6 +89,12 @@ class CoachPanel(QWidget):
         self.lessons_button.clicked.connect(self.lessons_requested.emit)
         self.weaknesses_button.clicked.connect(self.weaknesses_requested.emit)
         self.filter.currentIndexChanged.connect(lambda: self.show_ply(self.current_ply))
+
+    def set_preferences(self, perspective: str, verbosity: str) -> None:
+        index = self.filter.findData(perspective)
+        self.filter.setCurrentIndex(index if index >= 0 else 0)
+        self.verbosity = verbosity if verbosity in ("concise", "detailed") else "detailed"
+        self.show_ply(self.current_ply)
 
     def set_ai_ready(self, ready: bool) -> None:
         self.cloud_toggle.setEnabled(ready)
@@ -203,10 +210,10 @@ class CoachPanel(QWidget):
             self.feedback.setText("No feedback is stored for this move.")
             return
         line = san_variation(move.fen, feedback.continuation) or "—"
-        self.feedback.setText(
-            f"{feedback.verdict} · {move.accuracy:.1f}%\n"
-            f"{feedback.explanation}\nLine: {line}\nTakeaway: {feedback.takeaway}"
-        )
+        text = f"{feedback.verdict} · {move.accuracy:.1f}%\n{feedback.explanation}"
+        if self.verbosity == "detailed":
+            text += f"\nLine: {line}\nTakeaway: {feedback.takeaway}"
+        self.feedback.setText(text)
 
 
 class PracticeDialog(QDialog):

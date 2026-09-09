@@ -31,6 +31,8 @@ class ChessBoard(QWidget):
         self.input_message = "Wait for the computer to move."
         self.played_highlight: chess.Move | None = None
         self.best_highlight: chess.Move | None = None
+        self.theme = "classic"
+        self.piece_scale = 100
         self.squares: dict[chess.Square, QPushButton] = {}
         layout = QGridLayout(self)
         self.board_layout = layout
@@ -100,6 +102,14 @@ class ChessBoard(QWidget):
         self.best_highlight = best
         self.refresh()
 
+    def set_appearance(self, theme: str, piece_scale: int) -> None:
+        self.theme = theme if theme in ("classic", "high_contrast") else "classic"
+        self.piece_scale = max(75, min(piece_scale, 120))
+        icon_size = round(46 * self.piece_scale / 100)
+        for button in self.squares.values():
+            button.setIconSize(QSize(icon_size, icon_size))
+        self.refresh()
+
     def set_classification(self, text: str, color: str = "#555555") -> None:
         self.classification_badge.move(max(0, self.width() - 94), 6)
         self.classification_badge.setText(text)
@@ -125,10 +135,25 @@ class ChessBoard(QWidget):
                 if piece
                 else "empty"
             )
-            button.setAccessibleName(f"{name}: {description}")
+            highlights = []
+            if self.played_highlight and square in (
+                self.played_highlight.from_square,
+                self.played_highlight.to_square,
+            ):
+                highlights.append("played move")
+            if self.best_highlight and square in (
+                self.best_highlight.from_square,
+                self.best_highlight.to_square,
+            ):
+                highlights.append("engine move")
+            highlight_text = f"; {', '.join(highlights)}" if highlights else ""
+            button.setAccessibleName(f"{name}: {description}{highlight_text}")
             button.setToolTip(f"{name}: {description}")
             light = (chess.square_file(square) + chess.square_rank(square)) % 2 == 1
-            background = "#f0d9b5" if light else "#b58863"
+            if self.theme == "high_contrast":
+                background = "#f7f7f7" if light else "#4b4b4b"
+            else:
+                background = "#f0d9b5" if light else "#b58863"
             border = "transparent"
             if self.played_highlight and square in (
                 self.played_highlight.from_square,

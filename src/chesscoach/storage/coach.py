@@ -513,6 +513,15 @@ class CoachRepository:
                 "WHERE profile_id=? AND outcome='observed' ORDER BY created_at DESC",
                 (profile_id,),
             ).fetchall()
+            analyses = connection.execute(
+                "SELECT ar.game_id, ma.ply, ma.data_json FROM move_analyses ma "
+                "JOIN analysis_runs ar ON ar.id=ma.run_id ORDER BY ar.updated_at DESC"
+            ).fetchall()
+        evidence_by_position: dict[tuple[str, int], tuple[Evidence, ...]] = {}
+        for game_id, ply, data_json in analyses:
+            key = (str(game_id), int(ply))
+            if key not in evidence_by_position:
+                evidence_by_position[key] = _move_from_dict(json.loads(data_json)).evidence
         now = datetime.now(UTC)
         grouped: dict[str, list[tuple[str, int, float, str]]] = {}
         for game_id, ply, theme, confidence, created_at in rows:
@@ -532,8 +541,19 @@ class CoachRepository:
             trend = "new" if not earlier else "improving" if recent < earlier else "needs attention"
             confidence = sum(event[2] for event in events) / len(events) if events else 0.0
             examples = tuple((event[0], event[1]) for event in events[:3])
+            reason = next(
+                (
+                    fact.summary
+                    for example in examples
+                    for fact in evidence_by_position.get(example, ())
+                    if fact.tag == theme
+                ),
+                f"Engine analysis tagged {theme.replace('_', ' ')} in saved positions.",
+            )
             details.append(
-                WeaknessDetail(theme, score.score, score.occurrences, confidence, trend, examples)
+                WeaknessDetail(
+                    theme, score.score, score.occurrences, confidence, trend, examples, reason
+                )
             )
         return tuple(details)
 

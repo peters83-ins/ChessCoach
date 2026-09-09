@@ -34,9 +34,9 @@ class WeaknessDashboardDialog(QDialog):
         )
         note.setWordWrap(True)
         layout.addWidget(note)
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
-            ("Theme", "Score", "Games", "Confidence", "Trend", "Recent example")
+            ("Theme", "Score", "Games", "Confidence", "Trend", "Why", "Recent example")
         )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -66,6 +66,7 @@ class WeaknessDashboardDialog(QDialog):
                 str(detail.occurrences),
                 f"{detail.confidence:.0%}",
                 detail.trend.title(),
+                detail.reason,
                 f"Game {example[0][:8]} · ply {example[1]}" if example[0] else "—",
             )
             for column, value in enumerate(values):
@@ -111,6 +112,12 @@ class PracticeQueueDialog(QDialog):
         self.progress = QLabel()
         self.progress.setWordWrap(True)
         layout.addWidget(self.progress)
+        note = QLabel(
+            "Personal positions also reinforce the lesson concept. Correct follow-up moves "
+            "measure progress on that same theme."
+        )
+        note.setWordWrap(True)
+        layout.addWidget(note)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(("Theme", "Source", "Due", "Interval"))
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
