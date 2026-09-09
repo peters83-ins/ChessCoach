@@ -40,3 +40,36 @@ def test_cancel_active_search_closes_engine(
     app.processEvents()
     assert closed.is_set()
     assert results == errors == []
+
+
+def test_malformed_engine_output_reports_a_retryable_error(
+    app: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    finished = Event()
+
+    class BrokenEngine:
+        signature = "Broken Stockfish"
+
+        def __init__(self, path: str) -> None:
+            pass
+
+        def configure_difficulty(self, elo: int) -> int:
+            return elo
+
+        def analyze(self, *args: object, **kwargs: object) -> None:
+            raise ValueError("Stockfish returned no evaluation")
+
+        def close(self) -> None:
+            finished.set()
+
+    monkeypatch.setattr("chesscoach.engine.worker.Stockfish", BrokenEngine)
+    runner = EngineRunner()
+    errors: list[str] = []
+    runner.error.connect(lambda message: (errors.append(message), finished.set()))
+    runner.search(chess.Board(), "unused", 1000, False)
+    try:
+        assert finished.wait(2)
+        app.processEvents()
+    finally:
+        runner.shutdown()
+    assert errors and "no evaluation" in errors[0]
