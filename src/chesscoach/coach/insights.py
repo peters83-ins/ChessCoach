@@ -16,6 +16,18 @@ class LearningInsights:
     recommendation: str
 
 
+@dataclass(frozen=True)
+class TransferMetric:
+    theme: str
+    before_rate: float
+    after_rate: float
+    sample_size: int
+
+    @property
+    def delta(self) -> float:
+        return self.after_rate - self.before_rate
+
+
 def opening_stats(
     records: Iterable[tuple[OpeningMatch, str, str]], *, min_games: int = 5
 ) -> tuple[OpeningStatistic, ...]:
@@ -47,3 +59,21 @@ def recommend_next_action(due_reviews: int, weakest_theme: str, games: int) -> s
     if games:
         return "Review your latest saved game for a new practice position."
     return "Play or import a game to start building local learning insights."
+
+
+def theme_frequency(themes: Iterable[str]) -> tuple[tuple[str, int], ...]:
+    counts: dict[str, int] = {}
+    for theme in themes:
+        counts[theme] = counts.get(theme, 0) + 1
+    return tuple(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def transfer_metric(
+    theme: str, before: tuple[bool, ...], after: tuple[bool, ...], *, minimum: int = 5
+) -> TransferMetric | None:
+    """Compare success rates only when both periods have enough observations."""
+    if len(before) < minimum or len(after) < minimum:
+        return None
+    return TransferMetric(
+        theme, sum(before) / len(before), sum(after) / len(after), len(before) + len(after)
+    )

@@ -15,5 +15,7 @@ def test_insights_panel_has_local_summary_and_empty_chart(
     )
     assert "local Chess Coach estimates" in dialog.summary.text()
     assert dialog.openings.rowCount() == 0
+    assert dialog.themes.rowCount() == 0
+    assert "five qualifying" in dialog.transfer.text()
     assert dialog.mastery.value() == 0
     dialog.close()

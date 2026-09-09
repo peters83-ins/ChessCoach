@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from chesscoach.chess.openings import OpeningMatch
-from chesscoach.coach.insights import opening_stats, recommend_next_action
+from chesscoach.coach.insights import opening_stats, recommend_next_action, theme_frequency
 from chesscoach.courses.catalog import CourseCatalog
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameDatabase
@@ -43,6 +43,14 @@ class InsightsDialog(QDialog):
         self.openings.setHorizontalHeaderLabels(("Opening", "Games", "Wins", "Losses"))
         self.openings.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.openings, 1)
+        layout.addWidget(QLabel("Recurring themes from analyzed positions"))
+        self.themes = QTableWidget(0, 2)
+        self.themes.setHorizontalHeaderLabels(("Theme", "Occurrences"))
+        self.themes.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.themes)
+        self.transfer = QLabel()
+        self.transfer.setWordWrap(True)
+        layout.addWidget(self.transfer)
         self.refresh()
 
     def refresh(self) -> None:
@@ -59,10 +67,23 @@ class InsightsDialog(QDialog):
                 (stat.opening, str(stat.games), str(stat.wins), str(stat.losses))
             ):
                 self.openings.setItem(row, column, QTableWidgetItem(value))
+        frequencies = theme_frequency(
+            detail.theme
+            for detail in self.repository.weakness_details()
+            for _ in range(detail.occurrences)
+        )
+        self.themes.setRowCount(len(frequencies))
+        for row, (theme_name, count) in enumerate(frequencies):
+            self.themes.setItem(row, 0, QTableWidgetItem(theme_name.replace("_", " ").title()))
+            self.themes.setItem(row, 1, QTableWidgetItem(str(count)))
         due = len(self.repository.due_course_mastery()) + self.repository.practice_progress().due
         weaknesses = self.repository.weakness_details()
         theme = weaknesses[0].theme if weaknesses else ""
         self.mastery.setValue(self._mastery_percent())
+        self.transfer.setText(
+            "Transfer comparisons will appear after five qualifying before-and-after "
+            "practice observations for a theme."
+        )
         self.summary.setText(
             f"{len(games)} saved game(s). {recommend_next_action(due, theme, len(games))} "
             "All metrics are local Chess Coach estimates."
