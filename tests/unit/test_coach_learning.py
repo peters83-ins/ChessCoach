@@ -88,3 +88,5 @@ def test_repository_tracks_previously_failed_practice_items(tmp_path) -> None:
     assert repository.previously_failed_practice_ids() == frozenset()
     repository.record_practice_attempt(item, "f2f3", False)
     assert repository.previously_failed_practice_ids() == frozenset({"item"})
+    repository.record_practice_attempt(item, "e2e4", True)
+    assert repository.practice_transfer_observations() == {"fork": ((False,), (True,))}

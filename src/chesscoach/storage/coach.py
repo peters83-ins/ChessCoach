@@ -675,6 +675,24 @@ class CoachRepository:
             ).fetchall()
         return frozenset(str(row[0]) for row in rows)
 
+    def practice_transfer_observations(
+        self, profile_id: str = DEFAULT_PROFILE_ID
+    ) -> dict[str, tuple[tuple[bool, ...], tuple[bool, ...]]]:
+        """Group failed and successful practice attempts by theme."""
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(
+                "SELECT p.theme, a.successful FROM practice_attempts a "
+                "JOIN practice_items p ON p.id=a.item_id WHERE p.profile_id=? "
+                "ORDER BY a.attempted_at",
+                (profile_id,),
+            ).fetchall()
+        grouped: dict[str, tuple[list[bool], list[bool]]] = {}
+        for theme, successful in rows:
+            before, after = grouped.setdefault(str(theme), ([], []))
+            (after if successful else before).append(bool(successful))
+        return {theme: (tuple(before), tuple(after)) for theme, (before, after) in grouped.items()}
+
     def lessons(self, profile_id: str = DEFAULT_PROFILE_ID) -> tuple[Lesson, ...]:
         self.migrate()
         with closing(sqlite3.connect(self.path)) as connection:

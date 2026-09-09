@@ -22,6 +22,7 @@ from chesscoach.coach.insights import (
     phase_accuracy,
     recommend_next_action,
     theme_frequency,
+    transfer_metric,
 )
 from chesscoach.courses.catalog import CourseCatalog
 from chesscoach.storage.coach import CoachRepository
@@ -119,8 +120,19 @@ class InsightsDialog(QDialog):
         due = len(self.repository.due_course_mastery()) + self.repository.practice_progress().due
         theme = details[0].theme if details else ""
         self.mastery.setValue(self._mastery_percent())
+        transfer_rows = []
+        for theme_name, (before, after) in self.repository.practice_transfer_observations().items():
+            metric = transfer_metric(theme_name, before, after)
+            if metric is not None:
+                transfer_rows.append(
+                    f"{theme_name.replace('_', ' ').title()}: "
+                    f"{metric.after_rate:.0%} after vs {metric.before_rate:.0%} before "
+                    f"({metric.delta:+.0%}, {metric.sample_size} attempts)"
+                )
         self.transfer.setText(
-            "Transfer comparisons will appear after five qualifying before-and-after "
+            "Transfer: " + "; ".join(transfer_rows)
+            if transfer_rows
+            else "Transfer comparisons will appear after five qualifying before-and-after "
             "practice observations for a theme."
         )
         self.periods.setText(self._period_summary(games))
