@@ -1,7 +1,9 @@
 """PGN text interchange, independent of the board widget."""
 
 import io
+from collections.abc import Iterable
 
+import chess
 import chess.pgn
 
 from chesscoach.chess.game import Game
@@ -29,3 +31,16 @@ def parse_pgn(text: str) -> Game:
         if not game.attempt_move(move):
             raise ValueError("PGN contains an illegal move or continues after game over.")
     return game
+
+
+def san_variation(fen: str, moves: Iterable[str]) -> str:
+    """Format the legal prefix of a UCI variation as readable SAN."""
+    board = chess.Board(fen)
+    notation = []
+    for uci in moves:
+        move = chess.Move.from_uci(uci)
+        if move not in board.legal_moves:
+            break
+        notation.append(board.san(move))
+        board.push(move)
+    return " ".join(notation)

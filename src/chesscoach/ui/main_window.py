@@ -20,8 +20,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chesscoach import __version__
 from chesscoach.chess.game import Game
-from chesscoach.chess.pgn import export_pgn
+from chesscoach.chess.pgn import export_pgn, san_variation
 from chesscoach.chess.review import ReviewSession
 from chesscoach.coach.models import AnalysisProgress, CoachBundle, MoveAnalysis
 from chesscoach.coach.pipeline import CoachPipeline
@@ -35,6 +36,7 @@ from chesscoach.storage.database import GameData, GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
 from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog, PracticeDialog
+from chesscoach.ui.diagnostics import DiagnosticInfo, DiagnosticsDialog
 from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.game_review import GameReview
@@ -58,7 +60,9 @@ class MainWindow(QMainWindow):
         self.active = game is not None
         self.match: BotMatch | None = None
         self.engine_path = ""
+        self.engine_signature = ""
         self.engine_failed = False
+        self.last_error = ""
         self.review_details = ""
         self.review: ReviewSession | None = None
         self.review_cache: dict[str, PositionAnalysis] = {}
@@ -171,6 +175,7 @@ class MainWindow(QMainWindow):
         self.review_game_button = QPushButton("Review Game")
         self.review_game_button.hide()
         self.settings_button = QPushButton("Settings")
+        self.diagnostics_button = QPushButton("Diagnostics")
         for button in (
             self.new_game_button,
             self.undo_button,
@@ -181,6 +186,7 @@ class MainWindow(QMainWindow):
             self.retry_button,
             self.review_game_button,
             self.settings_button,
+            self.diagnostics_button,
         ):
             sidebar.addWidget(button)
         self.new_game_button.clicked.connect(self.new_game)
@@ -192,6 +198,7 @@ class MainWindow(QMainWindow):
         self.retry_button.clicked.connect(self.retry_engine)
         self.review_game_button.clicked.connect(self.review_current_game)
         self.settings_button.clicked.connect(self.open_settings)
+        self.diagnostics_button.clicked.connect(self.open_diagnostics)
         self.board.game_changed.connect(self.position_changed)
         self.board.message.connect(self.show_board_message)
         self.refresh()
@@ -223,6 +230,22 @@ class MainWindow(QMainWindow):
             self.setup.engine_path.setText(settings.stockfish_path)
         self.coach_panel.set_ai_ready(bool(settings.openai_api_key and settings.openai_model))
         self.statusBar().showMessage("Settings saved locally.", 4000)
+
+    def open_diagnostics(self) -> None:
+        ai_ready = bool(self.coach_settings.openai_api_key and self.coach_settings.openai_model)
+        info = DiagnosticInfo(
+            __version__,
+            str(self.database.path),
+            self.setup.engine_path.text().strip(),
+            self.engine_signature,
+            ai_ready,
+            self.last_error,
+        )
+        DiagnosticsDialog(
+            info,
+            secret=self.coach_settings.openai_api_key,
+            parent=self,
+        ).exec()
 
     def refresh(self) -> None:
         status = self.game.status()
@@ -340,6 +363,7 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def engine_result(self, result: SearchResult) -> None:
+        self.engine_signature = result.engine_signature
         if self.review is not None:
             self.review_cache[result.analysis.fen] = result.analysis
             position = self.review.analysis_position(self.review.index)
@@ -375,6 +399,7 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def engine_error(self, message: str) -> None:
+        self.last_error = message
         self.engine_failed = True
         self.engine_label.setText(message)
         self.evaluation_bar.clear()
@@ -450,13 +475,17 @@ class MainWindow(QMainWindow):
         self.evaluation_bar.set_orientation(data.player_color == "white")
         self.review_panel.show()
         self.coach_panel.show()
+        resumable = None
         if self.coach_bundle is not None:
             self.coach_panel.set_bundle(self.coach_bundle, data.player_color, data.result)
             self.review_panel.set_analysis(self.coach_bundle.analysis, data.player_color)
         else:
             self.review_panel.set_analysis(None, data.player_color)
+            resumable = self.coach_repository.latest_run_status(data.id)
         self.review_panel.configure(review.total)
         self.set_review_index(0 if auto_analyze else review.total)
+        if resumable is not None and resumable.state != "complete":
+            self.coach_panel.set_resumable(resumable.completed, resumable.total, resumable.state)
         self.statusBar().showMessage("Saved game loaded for review.")
         if auto_analyze:
             self.start_coach_analysis()
@@ -616,15 +645,23 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Full-game coaching analysis complete.")
 
     def coach_error(self, message: str) -> None:
+        self.last_error = message
         self.coach_running = False
         self.coach_panel.set_running(False)
-        self.coach_panel.feedback.setText(message)
+        self.coach_panel.set_resumable(
+            self.coach_panel.progress.value(), self.coach_panel.progress.maximum(), "failed"
+        )
+        self.coach_panel.feedback.setText(
+            f"{message}\nChoose Resume Analysis to reuse completed positions."
+        )
 
     def cancel_coach_analysis(self) -> None:
         self.coach_runner.cancel()
         self.coach_running = False
         self.coach_panel.set_running(False)
-        self.coach_panel.feedback.setText("Analysis cancelled; completed positions remain cached.")
+        self.coach_panel.set_resumable(
+            self.coach_panel.progress.value(), self.coach_panel.progress.maximum(), "cancelled"
+        )
 
     def toggle_best_line(self) -> None:
         """Play or hide the stored engine continuation for the selected move."""
@@ -737,7 +774,7 @@ class MainWindow(QMainWindow):
         hints = (
             f"Focus on: {theme}.",
             f"Candidate move: {analyzed.best_san}.",
-            f"Engine line: {' '.join(analyzed.best_pv)}",
+            f"Engine line: {san_variation(analyzed.fen, analyzed.best_pv)}",
         )
         self.coach_panel.feedback.setText(hints[self.retry_hint_level - 1])
 

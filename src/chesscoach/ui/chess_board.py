@@ -101,6 +101,7 @@ class ChessBoard(QWidget):
         self.refresh()
 
     def set_classification(self, text: str, color: str = "#555555") -> None:
+        self.classification_badge.move(max(0, self.width() - 94), 6)
         self.classification_badge.setText(text)
         self.classification_badge.setStyleSheet(
             f"background: {color}; color: white; font-weight: bold; border-radius: 5px;"

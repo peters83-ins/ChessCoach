@@ -139,6 +139,7 @@ def test_analysis_progress_result_and_review_reuse(
     assert "Mistake" in window.coach_panel.feedback.text()
     assert "82.0% move accuracy" in window.engine_label.text()
     assert window.review_panel.best_label.text() == "Engine best: e4"
+    assert "Line: e4 e5" in window.coach_panel.feedback.text()
     assert "?" in window.history.item(0, 1).text()
 
 
@@ -212,3 +213,17 @@ def test_interactive_practice_and_lesson_completion(app: QApplication, tmp_path:
     assert repository.lessons()[0].completed
     practice.close()
     lesson.close()
+
+
+def test_interrupted_analysis_is_offered_for_resume(
+    coach_window: tuple[MainWindow, FakeCoachRunner, GameData],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window, _, game_data = coach_window
+    run_id = window.coach_repository.start_run(game_data.id, AnalysisProfile())
+    window.coach_repository.update_run(run_id, "cancelled", 1, 4)
+    monkeypatch.setattr(SavedGamesDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+    monkeypatch.setattr(SavedGamesDialog, "selected_game_id", lambda self: game_data.id)
+    window.load_saved_game()
+    assert window.coach_panel.analyze_button.text() == "Resume Analysis"
+    assert "reuses every completed cached position" in window.coach_panel.feedback.text()

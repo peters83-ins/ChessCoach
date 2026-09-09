@@ -28,11 +28,13 @@ class FirstRunWizard(QWizard):
         settings: Settings,
         database_path: Path,
         env_path: Path = Path(".env"),
+        preferences: QSettings | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.database_path = database_path
         self.env_path = env_path
+        self.preferences = preferences if preferences is not None else QSettings()
         self.setWindowTitle("Welcome to Chess Coach")
         self.setOption(QWizard.WizardOption.NoBackButtonOnStartPage)
         self.addPage(self._welcome_page())
@@ -143,6 +145,6 @@ class FirstRunWizard(QWizard):
             },
         )
         apply_process_settings(settings)
-        QSettings().setValue("setup/complete", True)
+        self.preferences.setValue("setup/complete", True)
         self.settings_saved.emit(settings)
         super().accept()

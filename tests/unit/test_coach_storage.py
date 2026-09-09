@@ -135,3 +135,12 @@ def test_version_one_feedback_schema_migrates_without_data_loss(tmp_path: Path) 
     assert "model" in columns and "context_hash" in columns
     assert row == ("game", "", "")
     assert version == 2
+
+
+def test_latest_run_status_supports_resume(tmp_path: Path) -> None:
+    repository = CoachRepository(tmp_path / "games.sqlite3")
+    run_id = repository.start_run("game", AnalysisProfile())
+    repository.update_run(run_id, "cancelled", 3, 10)
+    status = repository.latest_run_status("game")
+    assert status is not None
+    assert (status.state, status.completed, status.total) == ("cancelled", 3, 10)

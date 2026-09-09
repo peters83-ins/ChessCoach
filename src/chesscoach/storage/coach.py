@@ -3,7 +3,7 @@
 import json
 import sqlite3
 from contextlib import closing
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +27,14 @@ from chesscoach.coach.practice import schedule_attempt
 
 SCHEMA_VERSION = 2
 DEFAULT_PROFILE_ID = "default"
+
+
+@dataclass(frozen=True)
+class AnalysisRunStatus:
+    state: str
+    completed: int
+    total: int
+    error: str = ""
 
 
 def _now() -> str:
@@ -200,6 +208,21 @@ class CoachRepository:
                 "updated_at=? WHERE id=?",
                 (state, completed, total, error, _now(), run_id),
             )
+
+    def latest_run_status(self, game_id: str) -> AnalysisRunStatus | None:
+        """Return the latest job state so interrupted work can be explained and resumed."""
+        if not self.path.is_file():
+            return None
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection:
+            row = connection.execute(
+                "SELECT state, completed, total, COALESCE(error, '') FROM analysis_runs "
+                "WHERE game_id=? ORDER BY updated_at DESC LIMIT 1",
+                (game_id,),
+            ).fetchone()
+        return (
+            AnalysisRunStatus(str(row[0]), int(row[1]), int(row[2]), str(row[3])) if row else None
+        )
 
     def save_analysis(self, run_id: str, analysis: GameAnalysis) -> None:
         with closing(sqlite3.connect(self.path)) as connection, connection:

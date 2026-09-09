@@ -33,7 +33,7 @@ class ConnectionWorker(QThread):
         try:
             test_connection(self.settings)
         except Exception as error:
-            self.completed.emit(False, _safe_connection_error(error))
+            self.completed.emit(False, _safe_connection_error(error, self.settings.openai_api_key))
         else:
             self.completed.emit(True, "Ready")
 
@@ -167,8 +167,9 @@ class SettingsDialog(QDialog):
         self.accept()
 
 
-def _safe_connection_error(error: Exception) -> str:
+def _safe_connection_error(error: Exception, secret: str = "") -> str:
     """Return a short error without request bodies, headers, or credentials."""
     name = type(error).__name__
-    text = str(error).splitlines()[0][:180]
+    text = str(error).replace(secret, "[redacted]") if secret else str(error)
+    text = text.splitlines()[0][:180]
     return f"{name}: {text}" if text else name

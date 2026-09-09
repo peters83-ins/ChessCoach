@@ -1,10 +1,14 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QApplication, QDialog
 
 from chesscoach.config import Settings
+from chesscoach.storage.database import GameDatabase
+from chesscoach.ui.diagnostics import DiagnosticsDialog
 from chesscoach.ui.first_run import FirstRunWizard
+from chesscoach.ui.main_window import MainWindow
 from chesscoach.ui.settings_dialog import SettingsDialog
 
 
@@ -35,9 +39,30 @@ def test_first_run_wizard_saves_playable_setup(app: QApplication, tmp_path: Path
     engine = tmp_path / "stockfish.exe"
     engine.write_text("engine")
     env_file = tmp_path / ".env"
-    wizard = FirstRunWizard(Settings(), tmp_path / "games" / "games.sqlite3", env_file)
+    preferences = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
+    wizard = FirstRunWizard(
+        Settings(),
+        tmp_path / "games" / "games.sqlite3",
+        env_file,
+        preferences,
+    )
     wizard.engine_path.setText(str(engine))
     wizard._refresh_ready_page(wizard.pageIds()[-1])
     assert "Stockfish: Ready" in wizard.checks_label.text()
     wizard.accept()
     assert f"STOCKFISH_PATH={engine}" in env_file.read_text()
+    assert preferences.value("setup/complete", False, bool)
+
+
+def test_main_window_settings_and_diagnostics_buttons(app: QApplication, tmp_path: Path) -> None:
+    window = MainWindow(database=GameDatabase(tmp_path / "games.sqlite3"))
+    window.show()
+    with (
+        patch.object(SettingsDialog, "exec", return_value=QDialog.DialogCode.Rejected) as settings,
+        patch.object(DiagnosticsDialog, "exec", return_value=QDialog.DialogCode.Accepted) as diag,
+    ):
+        window.settings_button.click()
+        window.diagnostics_button.click()
+    settings.assert_called_once()
+    diag.assert_called_once()
+    window.close()

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from chesscoach.chess.game import Game
+from chesscoach.chess.pgn import san_variation
 from chesscoach.coach.models import CoachBundle, Lesson, MoveClassification, PracticeItem
 from chesscoach.coach.scoring import player_accuracy
 from chesscoach.storage.coach import CoachRepository
@@ -98,6 +99,7 @@ class CoachPanel(QWidget):
     def clear(self) -> None:
         self.bundle = None
         self.current_ply = 0
+        self.analyze_button.setText("Analyze Full Game")
         self.report.setText("Run full-game analysis for coaching and accuracy.")
         self.feedback.clear()
         self.practice_button.setEnabled(False)
@@ -112,6 +114,13 @@ class CoachPanel(QWidget):
             self.progress.setRange(0, 0)
             self.feedback.setText("Scanning all moves…")
 
+    def set_resumable(self, completed: int, total: int, state: str) -> None:
+        self.analyze_button.setText("Resume Analysis")
+        self.feedback.setText(
+            f"Previous analysis {state} after {completed} of {total} moves. "
+            "Resume reuses every completed cached position."
+        )
+
     def set_progress(self, completed: int, total: int, stage: str) -> None:
         self.progress.setRange(0, max(total, 1))
         self.progress.setValue(completed)
@@ -119,6 +128,7 @@ class CoachPanel(QWidget):
 
     def set_bundle(self, bundle: CoachBundle, player_color: str, result: str = "*") -> None:
         self.bundle = bundle
+        self.analyze_button.setText("Analyze Again")
         self.player_color = player_color
         phases = " · ".join(
             f"{phase.phase.value.title()} {phase.accuracy:.1f}%"
@@ -172,7 +182,7 @@ class CoachPanel(QWidget):
         if feedback is None:
             self.feedback.setText("No feedback is stored for this move.")
             return
-        line = " ".join(feedback.continuation) or "—"
+        line = san_variation(move.fen, feedback.continuation) or "—"
         self.feedback.setText(
             f"{feedback.verdict} · {move.accuracy:.1f}%\n"
             f"{feedback.explanation}\nLine: {line}\nTakeaway: {feedback.takeaway}"
@@ -227,7 +237,7 @@ class PracticeDialog(QDialog):
         hints = (
             f"Theme: {self.item.theme.replace('_', ' ')}.",
             f"Candidate move: {board.san(first)}.",
-            f"Engine line: {_san_line(board, self.item.solution)}",
+            f"Engine line: {san_variation(board.fen(), self.item.solution)}",
         )
         self.prompt.setText(hints[self.hint_level - 1])
 
@@ -277,14 +287,3 @@ class LessonsDialog(QDialog):
         if 0 <= index < len(self.lessons):
             self.repository.set_lesson_completed(self.lessons[index].id)
             self.content.setText(self.content.text() + "\n\nCompleted.")
-
-
-def _san_line(board: chess.Board, moves: tuple[str, ...]) -> str:
-    san = []
-    for uci in moves:
-        move = chess.Move.from_uci(uci)
-        if move not in board.legal_moves:
-            break
-        san.append(board.san(move))
-        board.push(move)
-    return " ".join(san)

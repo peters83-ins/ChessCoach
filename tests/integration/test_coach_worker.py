@@ -132,3 +132,34 @@ def test_coach_runner_cancels_without_error(
     runner.shutdown()
     app.processEvents()
     assert result.count() == error.count() == 0
+
+
+def test_coach_worker_redacts_secret_from_failure(
+    app: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret = "sk-test-secret"
+
+    class FailingService:
+        def __init__(self, cache=None) -> None:
+            pass
+
+        def analyze(self, *args, **kwargs):
+            raise RuntimeError(f"request failed with {secret}")
+
+    monkeypatch.setattr("chesscoach.coach.worker.GameAnalysisService", FailingService)
+    repository = CoachRepository(tmp_path / "coach.sqlite3")
+    runner = CoachRunner()
+    errors = QSignalSpy(runner.error)
+    runner.start(
+        game_data(),
+        "engine",
+        repository,
+        Settings(openai_api_key=secret, openai_model="model"),
+    )
+    assert runner.workers[-1].wait(3000)
+    app.processEvents()
+    assert errors.count() == 1
+    assert secret not in errors.at(0)[0]
+    with sqlite3.connect(repository.path) as connection:
+        stored = connection.execute("SELECT error FROM analysis_runs").fetchone()[0]
+    assert secret not in stored

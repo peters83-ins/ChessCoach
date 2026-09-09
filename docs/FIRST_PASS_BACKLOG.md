@@ -4,6 +4,10 @@ This is the working reference for turning the current engine, review, coaching,
 practice, and lesson modules into a coherent first release. Complete items roughly
 in priority order, keeping each numbered item independently reviewable.
 
+Implementation status: P0 items 1–7 were completed on the `feature/p0-first-pass`
+branch. Keep the acceptance details below as regression requirements. P1 remains
+out of scope until the first-pass workflow receives user testing.
+
 ## Release goal
 
 A new user can install Stockfish, play or load a game, run a review, understand the
@@ -148,4 +152,3 @@ perspective/settings, and self-analysis. Those interaction ideas inform this bac
 the app will retain its own scoring, wording, visual identity, and locally verified
 analysis. See [Chess.com Game Review](https://support.chess.com/en/articles/8584089-how-does-game-review-work)
 and [accuracy overview](https://support.chess.com/en/articles/8708970-how-is-accuracy-in-analysis-determined).
-

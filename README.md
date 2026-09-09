@@ -16,6 +16,12 @@ If `.venv` does not exist, create it first with `py -3 -m venv .venv` using Pyth
 3.12 or newer. Optional activation: `.\.venv\Scripts\Activate.ps1`. Once activated,
 `python -m chesscoach.main` also launches the app.
 
+On first launch, a setup guide checks the saved-game folder, looks for Stockfish,
+and offers optional OpenAI configuration. The same fields remain available through
+**Settings**. The API key is masked and stored only in the ignored local `.env`.
+Use **Diagnostics** to copy the app version, database path, engine details, AI
+readiness, and latest sanitized error.
+
 Install a compatible local Stockfish executable separately, outside the repository.
 In the app, choose **White or Black**, choose a difficulty, **Browse** to the
 executable, then **Start Match**. Selecting Black flips the board and Stockfish
@@ -185,8 +191,18 @@ feedback in the review panel. The report includes project-specific accuracy, pha
 results, turning points, recurring weaknesses, practice positions, and tailored
 lessons. Analysis and feedback are stored in the same SQLite database and reused.
 
+After a bot game ends, **Review Game** saves and opens it, then starts analysis in
+one action. The review begins with a whole-game summary and clickable evaluation
+graph. **Next Key Moment** visits the learner's turning points; arrow keys and the
+move list provide direct navigation. **Show Best Line** replays the cached engine
+variation, while **Retry Move** hides the answer and returns to the exact review
+position afterward. Cancelled or failed analysis can be resumed with cached
+positions intact.
+
 The local coach works without credentials. To improve the wording for critical
 player moves, set both `OPENAI_API_KEY` and `OPENAI_MODEL` in the ignored `.env`.
+You can enter these through **Settings**, choose **Test OpenAI**, then opt in for a
+particular review with **Use OpenAI for critical-move explanations**.
 Only selected positions, legal moves, engine lines, classifications, and extracted
 evidence are sent; full PGNs and API keys are not stored or transmitted by the
 coaching pipeline. Invalid or unavailable AI output falls back to local feedback.

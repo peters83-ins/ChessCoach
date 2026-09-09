@@ -17,6 +17,7 @@ class SearchResult:
     analysis: PositionAnalysis
     move: chess.Move | None
     actual_elo: int
+    engine_signature: str = "Stockfish"
 
 
 class EngineWorker(QThread):
@@ -57,7 +58,10 @@ class EngineWorker(QThread):
                 return
             move = self.engine.play(self.position) if self.play_move else None
             if not self.cancelled.is_set():
-                self.result.emit(self.generation, SearchResult(analysis, move, actual))
+                self.result.emit(
+                    self.generation,
+                    SearchResult(analysis, move, actual, self.engine.signature),
+                )
         except Exception as error:
             if not self.cancelled.is_set():
                 logging.getLogger(__name__).exception("Stockfish search failed")
