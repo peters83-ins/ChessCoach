@@ -4,9 +4,9 @@ This is the working reference for turning the current engine, review, coaching,
 practice, and lesson modules into a coherent first release. Complete items roughly
 in priority order, keeping each numbered item independently reviewable.
 
-Implementation status: P0 items 1–7 were completed on the `feature/p0-first-pass`
-branch. Keep the acceptance details below as regression requirements. P1 remains
-out of scope until the first-pass workflow receives user testing.
+Implementation status: P0 items 1–7 and P1 items 8–13 are complete. Keep the
+acceptance details below as regression requirements. P2 remains out of scope until
+the first-pass workflow receives user testing.
 
 ## Release goal
 

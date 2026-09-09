@@ -63,3 +63,15 @@ def test_old_weakness_evidence_decays() -> None:
     old = WeaknessEvent("p", "g2", 1, "material", 2, 1, observed_at="2025-06-01T00:00:00+00:00")
     scores = {item.theme: item.score for item in aggregate_weaknesses((recent, old), now=now)}
     assert scores["fork"] > scores["material"]
+
+
+def test_one_game_cannot_dominate_a_weakness() -> None:
+    now = datetime(2026, 6, 1, tzinfo=UTC)
+    events = (
+        WeaknessEvent("p", "one-game", 1, "fork", 3, 1, observed_at=now.isoformat()),
+        WeaknessEvent("p", "one-game", 3, "fork", 3, 1, observed_at=now.isoformat()),
+        WeaknessEvent("p", "other-game", 1, "material", 2, 1, observed_at=now.isoformat()),
+    )
+    scores = {item.theme: item for item in aggregate_weaknesses(events, now=now)}
+    assert scores["fork"].score == 3
+    assert scores["fork"].occurrences == 1

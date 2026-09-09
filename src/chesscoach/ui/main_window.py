@@ -1,11 +1,12 @@
 """Match setup, human/engine turns, and explicit persistence feedback."""
 
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
 
 import chess
 from PySide6.QtCore import QSettings, QStandardPaths, Qt, QTimer
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QScrollArea,
+    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -31,15 +33,17 @@ from chesscoach.coach.worker import CoachRunner
 from chesscoach.config import Settings
 from chesscoach.engine.analysis import PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
+from chesscoach.preferences import UserPreferences
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameData, GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
-from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog, PracticeDialog
+from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog
 from chesscoach.ui.diagnostics import DiagnosticInfo, DiagnosticsDialog
 from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.game_review import GameReview
+from chesscoach.ui.learning_center import PracticeQueueDialog, WeaknessDashboardDialog
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import BADGES, MoveHistory
 from chesscoach.ui.saved_games import SavedGamesDialog
@@ -54,6 +58,7 @@ class MainWindow(QMainWindow):
         database: GameDatabase | None = None,
         runner: EngineRunner | None = None,
         coach_runner: CoachRunner | None = None,
+        preference_settings: QSettings | None = None,
     ) -> None:
         super().__init__()
         self.game = game if game is not None else Game()
@@ -95,9 +100,36 @@ class MainWindow(QMainWindow):
         self.coach_runner.result.connect(self.coach_result)
         self.coach_runner.error.connect(self.coach_error)
         self.coach_settings = Settings.from_environment(Path(".env"))
+        self.preference_settings = preference_settings or QSettings()
+        self.preferences = UserPreferences.load(self.preference_settings)
         self.first_run_wizard: FirstRunWizard | None = None
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
+        navigation = QToolBar("Navigation", self)
+        navigation.setMovable(False)
+        navigation.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.addToolBar(navigation)
+        self.play_action = QAction("Play", self)
+        self.games_action = QAction("Games", self)
+        self.review_action = QAction("Review", self)
+        self.practice_action = QAction("Practice", self)
+        self.lessons_action = QAction("Lessons", self)
+        self.settings_action = QAction("Settings", self)
+        self.play_action.setShortcut(QKeySequence.StandardKey.New)
+        self.games_action.setShortcut(QKeySequence.StandardKey.Open)
+        self.review_action.setShortcut(QKeySequence("Ctrl+R"))
+        self.practice_action.setShortcut(QKeySequence("Ctrl+P"))
+        self.lessons_action.setShortcut(QKeySequence("Ctrl+L"))
+        self.settings_action.setShortcut(QKeySequence.StandardKey.Preferences)
+        for action in (
+            self.play_action,
+            self.games_action,
+            self.review_action,
+            self.practice_action,
+            self.lessons_action,
+            self.settings_action,
+        ):
+            navigation.addAction(action)
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
@@ -153,6 +185,7 @@ class MainWindow(QMainWindow):
         self.coach_panel.cancel_requested.connect(self.cancel_coach_analysis)
         self.coach_panel.practice_requested.connect(self.open_practice)
         self.coach_panel.lessons_requested.connect(self.open_lessons)
+        self.coach_panel.weaknesses_requested.connect(self.open_weaknesses)
         sidebar.addWidget(self.coach_panel)
         self.engine_label = QLabel("")
         self.engine_label.setWordWrap(True)
@@ -201,6 +234,13 @@ class MainWindow(QMainWindow):
         self.diagnostics_button.clicked.connect(self.open_diagnostics)
         self.board.game_changed.connect(self.position_changed)
         self.board.message.connect(self.show_board_message)
+        self.play_action.triggered.connect(self.new_game)
+        self.games_action.triggered.connect(self.load_saved_game)
+        self.review_action.triggered.connect(self.open_review_destination)
+        self.practice_action.triggered.connect(self.open_practice)
+        self.lessons_action.triggered.connect(self.open_lessons)
+        self.settings_action.triggered.connect(self.open_settings)
+        self.apply_preferences(self.preferences)
         self.refresh()
 
     def show_board_message(self, message: str) -> None:
@@ -220,8 +260,14 @@ class MainWindow(QMainWindow):
         wizard.open()
 
     def open_settings(self) -> None:
-        dialog = SettingsDialog(self.coach_settings, parent=self)
+        dialog = SettingsDialog(
+            self.coach_settings,
+            preferences=self.preferences,
+            preference_settings=self.preference_settings,
+            parent=self,
+        )
         dialog.settings_saved.connect(self.apply_settings)
+        dialog.preferences_saved.connect(self.apply_preferences)
         dialog.exec()
 
     def apply_settings(self, settings: Settings) -> None:
@@ -230,6 +276,26 @@ class MainWindow(QMainWindow):
             self.setup.engine_path.setText(settings.stockfish_path)
         self.coach_panel.set_ai_ready(bool(settings.openai_api_key and settings.openai_model))
         self.statusBar().showMessage("Settings saved locally.", 4000)
+
+    def apply_preferences(self, preferences: UserPreferences) -> None:
+        self.preferences = preferences
+        self.board.set_appearance(preferences.board_theme, preferences.piece_scale)
+        self.coach_panel.set_preferences(
+            preferences.review_perspective, preferences.coach_verbosity
+        )
+        point_size = round(10 * preferences.text_scale / 100)
+        central = self.centralWidget()
+        if central is not None:
+            central.setStyleSheet(f"font-size: {point_size}pt;")
+        if self.review is not None:
+            self._apply_review_orientation(self.review.data.player_color)
+            self.set_review_index(self.review.index)
+
+    def _apply_review_orientation(self, player_color: str) -> None:
+        preference = self.preferences.board_orientation
+        color = player_color == "white" if preference == "player" else preference == "white"
+        self.board.set_orientation(color)
+        self.evaluation_bar.set_orientation(color)
 
     def open_diagnostics(self) -> None:
         ai_ready = bool(self.coach_settings.openai_api_key and self.coach_settings.openai_model)
@@ -435,7 +501,23 @@ class MainWindow(QMainWindow):
         if not games:
             self.statusBar().showMessage(f"No saved games found in {self.database.path.parent}")
             return
-        dialog = SavedGamesDialog(games, str(self.database.path), self)
+        statuses = self.coach_repository.game_learning_statuses(tuple(game.id for game in games))
+        games = tuple(
+            replace(
+                game,
+                analyzed=status.analyzed if status is not None else False,
+                practice_count=status.practice_count if status is not None else 0,
+            )
+            for game in games
+            for status in (statuses.get(game.id),)
+        )
+        dialog = SavedGamesDialog(
+            games,
+            str(self.database.path),
+            self,
+            delete_game=self.delete_saved_game,
+            export_game=self.export_saved_game,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         game_id = dialog.selected_game_id()
@@ -451,6 +533,37 @@ class MainWindow(QMainWindow):
             return
         self.open_review(data)
 
+    def open_review_destination(self) -> None:
+        if self.review is not None:
+            self.review_panel.setFocus()
+        elif self.match is not None and self.game.status().game_over:
+            self.review_current_game()
+        else:
+            self.load_saved_game()
+
+    def delete_saved_game(self, game_id: str) -> bool:
+        try:
+            deleted = self.database.delete_game(game_id)
+            if deleted:
+                self.coach_repository.delete_game_learning(game_id)
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Delete failed: {error}")
+            return False
+        self.statusBar().showMessage("Saved game deleted." if deleted else "Game not found.")
+        return deleted
+
+    def export_saved_game(self, game_id: str, path: Path) -> bool:
+        try:
+            data = self.database.load_game(game_id)
+            if data is None:
+                raise ValueError("Game not found.")
+            path.write_text(data.pgn, encoding="utf-8")
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Export failed: {error}")
+            return False
+        self.statusBar().showMessage(f"PGN exported to {path}")
+        return True
+
     def open_review(self, data: GameData, *, auto_analyze: bool = False) -> None:
         """Open validated saved data in the reusable review workspace."""
         try:
@@ -465,14 +578,14 @@ class MainWindow(QMainWindow):
         self.review_cache.clear()
         self.coach_bundle = CoachPipeline(self.coach_repository).load(data)
         self.coach_panel.clear()
+        self.coach_panel.set_game_context(data.moves)
         self.review_details = (
             f"Saved game for analysis · Player {data.player_color.title()} · "
             f"Bot {data.bot_elo} · Result {data.result}"
         )
         self.setup.setEnabled(False)
         self.setup.hide()
-        self.board.set_orientation(data.player_color == "white")
-        self.evaluation_bar.set_orientation(data.player_color == "white")
+        self._apply_review_orientation(data.player_color)
         self.review_panel.show()
         self.coach_panel.show()
         resumable = None
@@ -580,9 +693,14 @@ class MainWindow(QMainWindow):
             f"{played[1].san} ({'Black' if played[1].color == chess.BLACK else 'White'})"
         )
         self.review_panel.set_details(played_text, best_san, evaluation)
-        self.board.set_review_moves(played[0], analysis.best_move)
+        best_move = analysis.best_move if self.preferences.show_best_move else None
+        self.board.set_review_moves(played[0], best_move)
         self.evaluation_bar.set_score(candidate.score)
-        self.engine_label.setText("Blue: played move · Purple: engine best")
+        self.engine_label.setText(
+            "Blue: played move · Purple: engine best"
+            if self.preferences.show_best_move
+            else "Blue: played move"
+        )
 
     def show_coach_move(self, analyzed: MoveAnalysis) -> None:
         if self.review is None:
@@ -603,7 +721,7 @@ class MainWindow(QMainWindow):
             f"{played[1].san} ({'Black' if played[1].color == chess.BLACK else 'White'})"
         )
         self.review_panel.set_details(played_text, analyzed.best_san, evaluation)
-        self.board.set_review_moves(played[0], best)
+        self.board.set_review_moves(played[0], best if self.preferences.show_best_move else None)
         badge, color = BADGES[analyzed.classification]
         self.board.set_classification(f"{analyzed.classification.value.title()} {badge}", color)
         self.evaluation_bar.set_score(pov_score(score))
@@ -628,6 +746,7 @@ class MainWindow(QMainWindow):
             path,
             self.coach_repository,
             settings,
+            self.preferences.engine_profile(),
         )
 
     def coach_progress(self, progress: AnalysisProgress) -> None:
@@ -792,14 +911,31 @@ class MainWindow(QMainWindow):
         self.set_review_index(ply)
 
     def open_practice(self) -> None:
-        if self.coach_bundle is None or not self.coach_bundle.practice:
-            return
-        PracticeDialog(self.coach_bundle.practice[0], self.coach_repository, self).exec()
+        PracticeQueueDialog(self.coach_repository, self).exec()
 
     def open_lessons(self) -> None:
-        if self.coach_bundle is None or not self.coach_bundle.lessons:
+        lessons = self.coach_repository.lessons()
+        if not lessons:
+            self.statusBar().showMessage("No lessons yet. Analyze a game to create them.")
             return
-        LessonsDialog(self.coach_bundle.lessons, self.coach_repository, self).exec()
+        LessonsDialog(lessons, self.coach_repository, self).exec()
+
+    def open_weaknesses(self) -> None:
+        dialog = WeaknessDashboardDialog(self.coach_repository, self)
+        dialog.example_requested.connect(self.open_game_example)
+        dialog.exec()
+
+    def open_game_example(self, game_id: str, ply: int) -> None:
+        try:
+            data = self.database.load_game(game_id)
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Open example failed: {error}")
+            return
+        if data is None:
+            self.statusBar().showMessage("The source game is no longer available.")
+            return
+        self.open_review(data)
+        self.set_review_index(min(ply, len(data.moves)))
 
     def new_game(self) -> None:
         if not self.save_match():

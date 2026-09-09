@@ -5,6 +5,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QDialog
 
 from chesscoach.config import Settings
+from chesscoach.preferences import UserPreferences
 from chesscoach.storage.database import GameDatabase
 from chesscoach.ui.diagnostics import DiagnosticsDialog
 from chesscoach.ui.first_run import FirstRunWizard
@@ -33,6 +34,30 @@ def test_settings_connection_states(app: QApplication) -> None:
     assert dialog.status.text() == "OpenAI: Testing…"
     dialog._test_finished(False, "AuthenticationError")
     assert "Connection failed" in dialog.status.text()
+
+
+def test_display_and_analysis_preferences_are_saved(app: QApplication, tmp_path: Path) -> None:
+    store = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
+    dialog = SettingsDialog(Settings(), tmp_path / ".env", UserPreferences(), store)
+    dialog.orientation.setCurrentIndex(dialog.orientation.findData("black"))
+    dialog.board_theme.setCurrentIndex(dialog.board_theme.findData("high_contrast"))
+    dialog.analysis_profile.setCurrentIndex(dialog.analysis_profile.findData("quick"))
+    dialog.review_perspective.setCurrentIndex(dialog.review_perspective.findData("both"))
+    dialog.verbosity.setCurrentIndex(dialog.verbosity.findData("concise"))
+    dialog.show_best_move.setChecked(False)
+    dialog.piece_scale.setValue(110)
+    dialog.text_scale.setValue(120)
+    dialog._save()
+
+    saved = UserPreferences.load(store)
+    assert saved.board_orientation == "black"
+    assert saved.board_theme == "high_contrast"
+    assert saved.analysis_profile == "quick"
+    assert saved.review_perspective == "both"
+    assert saved.coach_verbosity == "concise"
+    assert not saved.show_best_move
+    assert saved.piece_scale == 110
+    assert saved.text_scale == 120
 
 
 def test_first_run_wizard_saves_playable_setup(app: QApplication, tmp_path: Path) -> None:

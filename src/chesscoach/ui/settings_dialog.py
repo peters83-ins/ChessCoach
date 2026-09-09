@@ -2,10 +2,11 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QUrl, Signal
+from PySide6.QtCore import QSettings, QThread, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -14,12 +15,14 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from chesscoach.ai.client import test_connection
 from chesscoach.config import Settings, apply_process_settings, save_local_settings
+from chesscoach.preferences import UserPreferences
 
 
 class ConnectionWorker(QThread):
@@ -40,15 +43,20 @@ class ConnectionWorker(QThread):
 
 class SettingsDialog(QDialog):
     settings_saved = Signal(object)
+    preferences_saved = Signal(object)
 
     def __init__(
         self,
         settings: Settings,
         env_path: Path = Path(".env"),
+        preferences: UserPreferences | None = None,
+        preference_settings: QSettings | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.env_path = env_path
+        self.preferences = preferences or UserPreferences()
+        self.preference_settings = preference_settings
         self.worker: ConnectionWorker | None = None
         self.setWindowTitle("Chess Coach Settings")
         layout = QVBoxLayout(self)
@@ -75,6 +83,49 @@ class SettingsDialog(QDialog):
         self.model.setPlaceholderText("Model ID available to your API project")
         form.addRow("OpenAI model", self.model)
         layout.addLayout(form)
+        preference_form = QFormLayout()
+        self.orientation = QComboBox()
+        self.orientation.addItem("Player side", "player")
+        self.orientation.addItem("White", "white")
+        self.orientation.addItem("Black", "black")
+        self._select_data(self.orientation, self.preferences.board_orientation)
+        preference_form.addRow("Review orientation", self.orientation)
+        self.board_theme = QComboBox()
+        self.board_theme.addItem("Classic", "classic")
+        self.board_theme.addItem("High contrast", "high_contrast")
+        self._select_data(self.board_theme, self.preferences.board_theme)
+        preference_form.addRow("Board theme", self.board_theme)
+        self.piece_scale = QSpinBox()
+        self.piece_scale.setRange(75, 120)
+        self.piece_scale.setSuffix("%")
+        self.piece_scale.setValue(self.preferences.piece_scale)
+        preference_form.addRow("Piece size", self.piece_scale)
+        self.analysis_profile = QComboBox()
+        self.analysis_profile.addItem("Quick", "quick")
+        self.analysis_profile.addItem("Standard", "standard")
+        self.analysis_profile.addItem("Deep", "deep")
+        self._select_data(self.analysis_profile, self.preferences.analysis_profile)
+        preference_form.addRow("Analysis depth", self.analysis_profile)
+        self.review_perspective = QComboBox()
+        self.review_perspective.addItem("My moves", "player")
+        self.review_perspective.addItem("Both sides", "both")
+        self.review_perspective.addItem("All moves", "all")
+        self._select_data(self.review_perspective, self.preferences.review_perspective)
+        preference_form.addRow("Coach perspective", self.review_perspective)
+        self.show_best_move = QCheckBox("Highlight the engine move on the board")
+        self.show_best_move.setChecked(self.preferences.show_best_move)
+        preference_form.addRow("Best move", self.show_best_move)
+        self.verbosity = QComboBox()
+        self.verbosity.addItem("Concise", "concise")
+        self.verbosity.addItem("Detailed", "detailed")
+        self._select_data(self.verbosity, self.preferences.coach_verbosity)
+        preference_form.addRow("Coach feedback", self.verbosity)
+        self.text_scale = QSpinBox()
+        self.text_scale.setRange(90, 140)
+        self.text_scale.setSuffix("%")
+        self.text_scale.setValue(self.preferences.text_scale)
+        preference_form.addRow("Text size", self.text_scale)
+        layout.addLayout(preference_form)
         actions = QHBoxLayout()
         self.key_page_button = QPushButton("Open API key page")
         self.test_button = QPushButton("Test OpenAI")
@@ -104,7 +155,24 @@ class SettingsDialog(QDialog):
         self.model.textChanged.connect(lambda: self.status.setText(self._readiness_text()))
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
-        self.resize(560, 360)
+        self.resize(600, 650)
+
+    @staticmethod
+    def _select_data(combo: QComboBox, value: str) -> None:
+        index = combo.findData(value)
+        combo.setCurrentIndex(max(index, 0))
+
+    def current_preferences(self) -> UserPreferences:
+        return UserPreferences(
+            board_orientation=str(self.orientation.currentData()),
+            board_theme=str(self.board_theme.currentData()),
+            piece_scale=self.piece_scale.value(),
+            analysis_profile=str(self.analysis_profile.currentData()),
+            review_perspective=str(self.review_perspective.currentData()),
+            show_best_move=self.show_best_move.isChecked(),
+            coach_verbosity=str(self.verbosity.currentData()),
+            text_scale=self.text_scale.value(),
+        )
 
     def current_settings(self) -> Settings:
         return Settings(
@@ -163,7 +231,11 @@ class SettingsDialog(QDialog):
             },
         )
         apply_process_settings(settings)
+        preferences = self.current_preferences()
+        if self.preference_settings is not None:
+            preferences.save(self.preference_settings)
         self.settings_saved.emit(settings)
+        self.preferences_saved.emit(preferences)
         self.accept()
 
 

@@ -90,6 +90,7 @@ class OpenAIProvider:
             ),
             input=json.dumps(payloads),
             text={"format": _response_format()},
+            max_output_tokens=1200,
             store=False,
             timeout=30.0,
         )
