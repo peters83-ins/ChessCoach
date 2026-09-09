@@ -4,11 +4,14 @@ import json
 import sqlite3
 from contextlib import closing
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import chess
+
+from chesscoach.coach.adaptive import next_course_due
 from chesscoach.coach.models import (
     AnalysisProfile,
     CoachFeedback,
@@ -728,6 +731,22 @@ class CoachRepository:
                 "updated_at=excluded.updated_at",
                 (profile_id, course.id, course.version, first_module, now, now),
             )
+            for exercise in course.exercises:
+                board = chess.Board(exercise.fen)
+                learner = chess.WHITE if exercise.learner_color == "white" else chess.BLACK
+                decision_index = 0
+                for uci in exercise.line:
+                    if board.turn == learner:
+                        connection.execute(
+                            "INSERT OR IGNORE INTO course_mastery(profile_id, course_id, "
+                            "exercise_id, "
+                            "decision_index, level, due_at, attempts, errors, hints, "
+                            "last_result, updated_at) "
+                            "VALUES (?, ?, ?, ?, 0, ?, 0, 0, 0, '', ?)",
+                            (profile_id, course.id, exercise.id, decision_index, now, now),
+                        )
+                        decision_index += 1
+                    board.push_uci(uci)
 
     def course_progress(
         self, course_id: str | None = None, profile_id: str = DEFAULT_PROFILE_ID
@@ -780,6 +799,21 @@ class CoachRepository:
             ).fetchall()
         return tuple(MoveMastery(*row) for row in rows)
 
+    def due_course_mastery(
+        self, profile_id: str = DEFAULT_PROFILE_ID, now: str | None = None
+    ) -> tuple[MoveMastery, ...]:
+        self.migrate()
+        cutoff = now or _now()
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(
+                "SELECT profile_id, course_id, exercise_id, decision_index, level, due_at, "
+                "attempts, "
+                "errors, hints, last_result FROM course_mastery WHERE profile_id=? AND due_at<=? "
+                "ORDER BY due_at, course_id, exercise_id, decision_index",
+                (profile_id, cutoff),
+            ).fetchall()
+        return tuple(MoveMastery(*row) for row in rows)
+
     def record_course_attempt(
         self,
         course_id: str,
@@ -793,7 +827,16 @@ class CoachRepository:
         """Record one decision; a mistake affects only that decision's mastery."""
         self.migrate()
         now = datetime.now(UTC)
-        due = now + timedelta(days=1 if correct else 0)
+        current_level = 0
+        with closing(sqlite3.connect(self.path)) as connection:
+            existing = connection.execute(
+                "SELECT level FROM course_mastery WHERE profile_id=? AND course_id=? "
+                "AND exercise_id=? AND decision_index=?",
+                (profile_id, course_id, exercise_id, decision_index),
+            ).fetchone()
+            if existing:
+                current_level = int(existing[0])
+        due = next_course_due(current_level + (1 if correct else 0), correct, now)
         with closing(sqlite3.connect(self.path)) as connection, connection:
             connection.execute(
                 "INSERT INTO course_attempts(profile_id, course_id, exercise_id, decision_index, "
@@ -825,7 +868,7 @@ class CoachRepository:
                     exercise_id,
                     decision_index,
                     1 if correct else 0,
-                    due.isoformat(),
+                    due,
                     0 if correct else 1,
                     hints,
                     "correct" if correct else "mistake",
