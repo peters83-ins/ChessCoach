@@ -71,7 +71,8 @@ visual identity, reviewed offline content, and local-first data model.
 
 ### Stage 1 — Reliability and engine confidence
 
-- Add worker timeout, cancellation, malformed-output, and crash interaction coverage.
+- Add worker timeout, cancellation, and crash interaction coverage; malformed worker
+  output now has deterministic regression coverage.
 - Add install → play → save → load → analyze → retry → reopen tests.
 - Stress stale generation/FEN checks and delayed bot cancellation.
 - Run the opt-in real-Stockfish matrix for 800, 1000, 1200, and full strength.
