@@ -60,6 +60,14 @@ def test_display_and_analysis_preferences_are_saved(app: QApplication, tmp_path:
     assert saved.text_scale == 120
 
 
+def test_bot_delay_preference_is_saved(app: QApplication, tmp_path: Path) -> None:
+    store = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
+    dialog = SettingsDialog(Settings(), tmp_path / ".env", UserPreferences(), store)
+    dialog.bot_delay.setCurrentIndex(dialog.bot_delay.findData(300))
+    dialog._save()
+    assert UserPreferences.load(store).bot_move_delay_ms == 300
+
+
 def test_first_run_wizard_saves_playable_setup(app: QApplication, tmp_path: Path) -> None:
     engine = tmp_path / "stockfish.exe"
     engine.write_text("engine")

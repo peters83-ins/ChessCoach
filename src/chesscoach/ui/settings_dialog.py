@@ -125,6 +125,17 @@ class SettingsDialog(QDialog):
         self.text_scale.setSuffix("%")
         self.text_scale.setValue(self.preferences.text_scale)
         preference_form.addRow("Text size", self.text_scale)
+        self.bot_delay = QComboBox()
+        for label, value in (
+            ("Instant", 0),
+            ("Brief · 300 ms", 300),
+            ("Normal · 600 ms", 600),
+            ("Slow · 900 ms", 900),
+        ):
+            self.bot_delay.addItem(label, value)
+        delay_index = self.bot_delay.findData(self.preferences.bot_move_delay_ms)
+        self.bot_delay.setCurrentIndex(delay_index if delay_index >= 0 else 2)
+        preference_form.addRow("Bot reply delay", self.bot_delay)
         layout.addLayout(preference_form)
         actions = QHBoxLayout()
         self.key_page_button = QPushButton("Open API key page")
@@ -172,6 +183,7 @@ class SettingsDialog(QDialog):
             show_best_move=self.show_best_move.isChecked(),
             coach_verbosity=str(self.verbosity.currentData()),
             text_scale=self.text_scale.value(),
+            bot_move_delay_ms=int(self.bot_delay.currentData()),
         )
 
     def current_settings(self) -> Settings:

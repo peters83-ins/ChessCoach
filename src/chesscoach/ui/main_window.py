@@ -77,6 +77,12 @@ class MainWindow(QMainWindow):
         self.retry_hint_level = 0
         self.line_games: list[Game] = []
         self.line_step = 0
+        self.pending_bot_result: SearchResult | None = None
+        self.pending_bot_fen = ""
+        self.pending_bot_match_id = ""
+        self.bot_move_timer = QTimer(self)
+        self.bot_move_timer.setSingleShot(True)
+        self.bot_move_timer.timeout.connect(self.apply_pending_bot_move)
         self.review_timer = QTimer(self)
         self.review_timer.setSingleShot(True)
         self.review_timer.setInterval(150)
@@ -362,6 +368,7 @@ class MainWindow(QMainWindow):
         if not self.save_match():
             return
         self.runner.cancel()
+        self.cancel_pending_bot()
         self.game.reset()
         self.active = True
         self.engine_failed = False
@@ -403,6 +410,8 @@ class MainWindow(QMainWindow):
             return
         if self.match is not None:
             self.match.record_position()
+            if self.game.position.move_stack:
+                self.board.set_review_moves(self.game.position.move_stack[-1], None)
         self.refresh()
         if self.game.status().game_over:
             self.runner.cancel()
@@ -428,6 +437,12 @@ class MainWindow(QMainWindow):
         )
         self.refresh()
 
+    def cancel_pending_bot(self) -> None:
+        self.bot_move_timer.stop()
+        self.pending_bot_result = None
+        self.pending_bot_fen = ""
+        self.pending_bot_match_id = ""
+
     def engine_result(self, result: SearchResult) -> None:
         self.engine_signature = result.engine_signature
         if self.review is not None:
@@ -440,11 +455,18 @@ class MainWindow(QMainWindow):
             return
         self.match.elo = result.actual_elo
         if result.move is not None:
-            if self.game.turn == self.match.player_color or not self.game.attempt_move(result.move):
+            if self.game.turn == self.match.player_color or result.analysis.fen != self.game.fen:
                 self.engine_error("Stockfish returned a move for the wrong position. Retry Engine.")
                 return
-            self.board.clear_selection()
-            self.position_changed()
+            self.pending_bot_result = result
+            self.pending_bot_fen = self.game.fen
+            self.pending_bot_match_id = self.match.id
+            self.engine_label.setText("Stockfish is ready…")
+            if self.preferences.bot_move_delay_ms == 0:
+                self.apply_pending_bot_move()
+            else:
+                self.bot_move_timer.start(self.preferences.bot_move_delay_ms)
+            self.refresh()
             return
         candidate = result.analysis.candidates[0]
         score = candidate.score.white()
@@ -463,6 +485,28 @@ class MainWindow(QMainWindow):
             )
         )
         self.refresh()
+
+    def apply_pending_bot_move(self) -> None:
+        result = self.pending_bot_result
+        expected_fen = self.pending_bot_fen
+        expected_match_id = self.pending_bot_match_id
+        self.cancel_pending_bot()
+        if (
+            result is None
+            or result.move is None
+            or self.match is None
+            or self.match.id != expected_match_id
+            or not self.active
+            or self.game.status().game_over
+            or self.game.turn == self.match.player_color
+            or self.game.fen != expected_fen
+        ):
+            return
+        if not self.game.attempt_move(result.move):
+            self.engine_error("Stockfish returned a move for the wrong position. Retry Engine.")
+            return
+        self.board.clear_selection()
+        self.position_changed()
 
     def engine_error(self, message: str) -> None:
         self.last_error = message
@@ -572,6 +616,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Load failed: {error}")
             return
         self.runner.cancel()
+        self.cancel_pending_bot()
         self.match = None
         self.active = False
         self.review = review
@@ -627,6 +672,7 @@ class MainWindow(QMainWindow):
             return
         self.stop_best_line()
         self.runner.cancel()
+        self.cancel_pending_bot()
         self.review_timer.stop()
         self.engine_failed = False
         self.game = self.review.game_at(index)
@@ -941,6 +987,7 @@ class MainWindow(QMainWindow):
         if not self.save_match():
             return
         self.runner.cancel()
+        self.cancel_pending_bot()
         self.match = None
         self.active = False
         self.review_details = ""
@@ -970,6 +1017,7 @@ class MainWindow(QMainWindow):
         if self.match is not None and self.game.status().game_over:
             return
         self.runner.cancel()
+        self.cancel_pending_bot()
         self.game.undo()
         if self.match is not None:
             while self.game.turn != self.match.player_color and self.game.can_undo:
@@ -994,6 +1042,7 @@ class MainWindow(QMainWindow):
         if not self.save_match():
             event.ignore()
             return
+        self.cancel_pending_bot()
         self.runner.shutdown()
         self.coach_runner.shutdown()
         event.accept()

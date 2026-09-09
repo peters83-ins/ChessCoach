@@ -17,6 +17,7 @@ class UserPreferences:
     show_best_move: bool = True
     coach_verbosity: str = "detailed"
     text_scale: int = 100
+    bot_move_delay_ms: int = 600
 
     @classmethod
     def load(cls, settings: QSettings) -> "UserPreferences":
@@ -30,6 +31,7 @@ class UserPreferences:
             in ("true", "1"),
             coach_verbosity=str(settings.value("coach/verbosity", "detailed")),
             text_scale=int(str(settings.value("display/text_scale", 100))),
+            bot_move_delay_ms=int(str(settings.value("play/bot_move_delay_ms", 600))),
         )
 
     def save(self, settings: QSettings) -> None:
@@ -41,6 +43,7 @@ class UserPreferences:
         settings.setValue("review/show_best_move", self.show_best_move)
         settings.setValue("coach/verbosity", self.coach_verbosity)
         settings.setValue("display/text_scale", self.text_scale)
+        settings.setValue("play/bot_move_delay_ms", self.bot_move_delay_ms)
         settings.sync()
 
     def engine_profile(self) -> AnalysisProfile:
