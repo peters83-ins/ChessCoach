@@ -52,6 +52,7 @@ class MatchSetup(QWidget):
         path_layout.addWidget(self.engine_path, 1)
         path_layout.addWidget(self.browse)
         self.start_button = QPushButton("Start Match")
+        self.start_button.setObjectName("primaryAction")
         self.start_button.clicked.connect(self.start_requested.emit)
         layout.addRow("Mode", self.mode)
         layout.addRow("Your color", self.color)

@@ -52,6 +52,7 @@ from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import BADGES, MoveHistory
 from chesscoach.ui.saved_games import SavedGamesDialog
 from chesscoach.ui.settings_dialog import SettingsDialog
+from chesscoach.ui.theme import MODERN_STYLESHEET
 
 
 class MainWindow(QMainWindow):
@@ -66,6 +67,7 @@ class MainWindow(QMainWindow):
         course_catalog: CourseCatalog | None = None,
     ) -> None:
         super().__init__()
+        self.setStyleSheet(MODERN_STYLESHEET)
         self.game = game if game is not None else Game()
         self.active = game is not None
         self.match: BotMatch | None = None
@@ -231,6 +233,8 @@ class MainWindow(QMainWindow):
         self.review_game_button.hide()
         self.settings_button = QPushButton("Settings")
         self.diagnostics_button = QPushButton("Diagnostics")
+        for button in (self.new_game_button, self.save_button, self.review_game_button):
+            button.setObjectName("primaryAction")
         for button in (
             self.new_game_button,
             self.undo_button,
