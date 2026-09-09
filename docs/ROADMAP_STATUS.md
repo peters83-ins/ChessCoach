@@ -24,7 +24,8 @@ active development queue.
 - Add local charts for course mastery, due reviews, phase accuracy, tactical themes,
   and opening performance.
 - Require five qualifying games before showing opening win-rate conclusions.
-- Compare recent and previous periods with greater weight on recent games.
+- Compare recent and previous periods with greater weight on recent games (implemented
+  in the Insights panel; requires three games per period).
 - Measure transfer: opening departure, repeated tactical errors, delayed practice
   success, and phase-accuracy changes after related lessons.
 - Link theme insights to supporting game positions through the review action; extend
