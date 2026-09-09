@@ -132,6 +132,7 @@ def test_analysis_progress_result_and_review_reuse(
     monkeypatch.setattr(SavedGamesDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
     monkeypatch.setattr(SavedGamesDialog, "selected_game_id", lambda self: game_data.id)
     window.load_saved_game()
+    window._load_selected_saved_game(window.destination_dialogs["games"])
     assert window.coach_panel.isVisible()
     window.coach_panel.analyze_button.click()
     assert runner.requests[-1][0] == game_data
@@ -157,6 +158,7 @@ def test_best_line_and_retry_restore_review(
     monkeypatch.setattr(SavedGamesDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
     monkeypatch.setattr(SavedGamesDialog, "selected_game_id", lambda self: game_data.id)
     window.load_saved_game()
+    window._load_selected_saved_game(window.destination_dialogs["games"])
     window.coach_result(bundle())
     window.set_review_index(1)
     window.toggle_best_line()
@@ -231,6 +233,7 @@ def test_interrupted_analysis_is_offered_for_resume(
     monkeypatch.setattr(SavedGamesDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
     monkeypatch.setattr(SavedGamesDialog, "selected_game_id", lambda self: game_data.id)
     window.load_saved_game()
+    window._load_selected_saved_game(window.destination_dialogs["games"])
     assert window.coach_panel.analyze_button.text() == "Resume Analysis"
     assert "reuses every completed cached position" in window.coach_panel.feedback.text()
 

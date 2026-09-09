@@ -2,12 +2,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QApplication, QDialog
+from PySide6.QtWidgets import QApplication
 
 from chesscoach.config import Settings
 from chesscoach.preferences import UserPreferences
 from chesscoach.storage.database import GameDatabase
-from chesscoach.ui.diagnostics import DiagnosticsDialog
 from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.main_window import MainWindow
 from chesscoach.ui.settings_dialog import SettingsDialog
@@ -90,12 +89,8 @@ def test_first_run_wizard_saves_playable_setup(app: QApplication, tmp_path: Path
 def test_main_window_settings_and_diagnostics_buttons(app: QApplication, tmp_path: Path) -> None:
     window = MainWindow(database=GameDatabase(tmp_path / "games.sqlite3"))
     window.show()
-    with (
-        patch.object(SettingsDialog, "exec", return_value=QDialog.DialogCode.Rejected) as settings,
-        patch.object(DiagnosticsDialog, "exec", return_value=QDialog.DialogCode.Accepted) as diag,
-    ):
-        window.settings_button.click()
-        window.diagnostics_button.click()
-    settings.assert_called_once()
-    diag.assert_called_once()
+    window.settings_button.click()
+    assert window.workspace_stack.currentWidget() is window.destination_dialogs["settings"]
+    window.diagnostics_button.click()
+    assert window.workspace_stack.currentWidget() is window.destination_dialogs["diagnostics"]
     window.close()

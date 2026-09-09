@@ -38,7 +38,7 @@ from chesscoach.engine.analysis import PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
 from chesscoach.preferences import UserPreferences
 from chesscoach.storage.coach import CoachRepository
-from chesscoach.storage.database import GameData, GameDatabase
+from chesscoach.storage.database import GameData, GameDatabase, SavedGameSummary
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
 from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog
@@ -300,6 +300,9 @@ class MainWindow(QMainWindow):
         wizard.open()
 
     def open_settings(self) -> None:
+        self._show_destination("settings", self._make_settings)
+
+    def _make_settings(self) -> SettingsDialog:
         dialog = SettingsDialog(
             self.coach_settings,
             preferences=self.preferences,
@@ -308,7 +311,7 @@ class MainWindow(QMainWindow):
         )
         dialog.settings_saved.connect(self.apply_settings)
         dialog.preferences_saved.connect(self.apply_preferences)
-        dialog.exec()
+        return dialog
 
     def apply_settings(self, settings: Settings) -> None:
         self.coach_settings = settings
@@ -338,6 +341,9 @@ class MainWindow(QMainWindow):
         self.evaluation_bar.set_orientation(color)
 
     def open_diagnostics(self) -> None:
+        self._show_destination("diagnostics", self._make_diagnostics)
+
+    def _make_diagnostics(self) -> DiagnosticsDialog:
         ai_ready = bool(self.coach_settings.openai_api_key and self.coach_settings.openai_model)
         info = DiagnosticInfo(
             __version__,
@@ -347,11 +353,11 @@ class MainWindow(QMainWindow):
             ai_ready,
             self.last_error,
         )
-        DiagnosticsDialog(
+        return DiagnosticsDialog(
             info,
             secret=self.coach_settings.openai_api_key,
             parent=self,
-        ).exec()
+        )
 
     def refresh(self) -> None:
         status = self.game.status()
@@ -589,6 +595,14 @@ class MainWindow(QMainWindow):
             for game in games
             for status in (statuses.get(game.id),)
         )
+        self._show_destination(
+            "games",
+            lambda: self._make_saved_games_dialog(games),
+        )
+
+    def _make_saved_games_dialog(
+        self, games: tuple[SavedGameSummary, ...]
+    ) -> SavedGamesDialog:
         dialog = SavedGamesDialog(
             games,
             str(self.database.path),
@@ -596,8 +610,10 @@ class MainWindow(QMainWindow):
             delete_game=self.delete_saved_game,
             export_game=self.export_saved_game,
         )
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
+        dialog.accepted.connect(lambda: self._load_selected_saved_game(dialog))
+        return dialog
+
+    def _load_selected_saved_game(self, dialog: SavedGamesDialog) -> None:
         game_id = dialog.selected_game_id()
         if game_id is None:
             return
@@ -662,6 +678,7 @@ class MainWindow(QMainWindow):
             f"Saved game for analysis · Player {data.player_color.title()} · "
             f"Bot {data.bot_elo} · Result {data.result}"
         )
+        self.show_play_workspace()
         self.setup.setEnabled(False)
         self.setup.hide()
         self._apply_review_orientation(data.player_color)

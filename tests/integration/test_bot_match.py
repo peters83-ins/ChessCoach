@@ -250,6 +250,7 @@ def test_load_saved_game_for_analysis(
     monkeypatch.setattr(SavedGamesDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
     monkeypatch.setattr(SavedGamesDialog, "selected_game_id", lambda self: game_id)
     window.load_button.click()
+    window._load_selected_saved_game(window.destination_dialogs["games"])
     assert [move.san for move in window.game.history()] == ["e4", "e5"]
     assert window.review_details.startswith("Saved game for analysis")
     assert window.match is None
