@@ -1,5 +1,7 @@
 """Local, inspectable learning insights panel."""
 
+from datetime import UTC, datetime
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
@@ -16,6 +18,7 @@ from chesscoach.chess.openings import OpeningMatch
 from chesscoach.coach.insights import (
     analyzed_theme_counts,
     opening_stats,
+    period_comparison,
     phase_accuracy,
     recommend_next_action,
     theme_frequency,
@@ -72,6 +75,9 @@ class InsightsDialog(QDialog):
         self.transfer = QLabel()
         self.transfer.setWordWrap(True)
         layout.addWidget(self.transfer)
+        self.periods = QLabel()
+        self.periods.setWordWrap(True)
+        layout.addWidget(self.periods)
         self._theme_examples: dict[str, tuple[tuple[str, int], ...]] = {}
         self.refresh()
 
@@ -117,9 +123,38 @@ class InsightsDialog(QDialog):
             "Transfer comparisons will appear after five qualifying before-and-after "
             "practice observations for a theme."
         )
+        self.periods.setText(self._period_summary(games))
         self.summary.setText(
             f"{len(games)} saved game(s). {recommend_next_action(due, theme, len(games))} "
             "All metrics are local Chess Coach estimates."
+        )
+
+    def _period_summary(self, games: tuple[object, ...]) -> str:
+        values: list[tuple[float, datetime]] = []
+        for game in games:
+            saved_at = getattr(game, "saved_at", "")
+            try:
+                observed = datetime.fromisoformat(saved_at)
+            except ValueError:
+                continue
+            if observed.tzinfo is None:
+                observed = observed.replace(tzinfo=UTC)
+            result = getattr(game, "result", "")
+            color = getattr(game, "player_color", "white")
+            won = (result == "1-0" and color == "white") or (
+                result == "0-1" and color == "black"
+            )
+            score = 1.0 if won else 0.5 if result == "1/2-1/2" else 0.0
+            values.append((score, observed))
+        comparison = period_comparison(values)
+        if comparison is None:
+            return "Recent vs previous performance will appear after three games in each period."
+        recent, prior = comparison
+        delta = recent - prior
+        direction = "up" if delta >= 0 else "down"
+        return (
+            f"Recent performance: {recent:.0%} ({direction} {abs(delta):.0%} "
+            "vs previous period)."
         )
 
     def _update_example_button(self) -> None:
