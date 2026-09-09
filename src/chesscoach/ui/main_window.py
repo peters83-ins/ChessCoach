@@ -1007,10 +1007,14 @@ class MainWindow(QMainWindow):
         self._show_destination("learn", self._make_learning_home)
 
     def open_insights(self) -> None:
-        self._show_destination(
-            "insights",
-            lambda: InsightsDialog(self.coach_repository, self.database, self.course_catalog, self),
+        self._show_destination("insights", self._make_insights)
+
+    def _make_insights(self) -> InsightsDialog:
+        dialog = InsightsDialog(
+            self.coach_repository, self.database, self.course_catalog, self
         )
+        dialog.example_requested.connect(self.open_game_example)
+        return dialog
 
     def _make_learning_home(self) -> LearningHomeDialog:
         dialog = LearningHomeDialog(self.coach_repository, self.course_catalog, self.database, self)
