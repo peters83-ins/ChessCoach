@@ -28,13 +28,13 @@ def test_evaluation_bar_score_result_and_orientation(app: QApplication) -> None:
     bar.show()
     app.processEvents()
     image = bar.grab().toImage()
-    assert image.pixelColor(28, 10).lightness() < image.pixelColor(28, 190).lightness()
+    assert image.pixelColor(5, 10).lightness() < image.pixelColor(5, 190).lightness()
 
     bar.set_orientation(False)
     app.processEvents()
     assert not bar.white_at_bottom
     image = bar.grab().toImage()
-    assert image.pixelColor(28, 10).lightness() > image.pixelColor(28, 190).lightness()
+    assert image.pixelColor(5, 10).lightness() > image.pixelColor(5, 190).lightness()
     bar.set_result(chess.BLACK)
     assert bar.white_fraction == 0.02
     assert bar.display_text == "0-1"

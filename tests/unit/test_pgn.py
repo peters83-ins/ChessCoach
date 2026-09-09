@@ -2,7 +2,7 @@ import chess
 import pytest
 
 from chesscoach.chess.game import Game
-from chesscoach.chess.pgn import export_pgn, parse_pgn
+from chesscoach.chess.pgn import export_pgn, parse_pgn, san_variation
 
 
 def test_pgn_roundtrip() -> None:
@@ -39,3 +39,7 @@ def test_export_results() -> None:
 def test_reject_bad_pgn(text: str) -> None:
     with pytest.raises(ValueError):
         parse_pgn(text)
+
+
+def test_san_variation_formats_only_legal_prefix() -> None:
+    assert san_variation(chess.STARTING_FEN, ("e2e4", "e7e5", "e1e8")) == "e4 e5"

@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
 
@@ -29,7 +30,7 @@ def test_save_full_game_and_retry_without_duplicates(tmp_path: Path) -> None:
     assert result.success and result.game_id == "match-1" and result.error is None
     assert games_folder.is_dir()
     assert database.save_game(data).success
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection:
         assert connection.execute("SELECT count(*) FROM games").fetchone()[0] == 1
         record = connection.execute("SELECT data_json FROM games").fetchone()[0]
         moves = connection.execute(

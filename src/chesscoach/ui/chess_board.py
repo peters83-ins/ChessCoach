@@ -62,6 +62,10 @@ class ChessBoard(QWidget):
             layout.addWidget(label, 8, file + 1)
             layout.setColumnStretch(file + 1, 1)
         self.overlay = AttackOverlay(self, self.squares, lambda: self.game.position)
+        self.classification_badge = QLabel(self)
+        self.classification_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.classification_badge.setFixedSize(88, 30)
+        self.classification_badge.hide()
         self.refresh()
 
     def set_orientation(self, color: chess.Color) -> None:
@@ -77,6 +81,8 @@ class ChessBoard(QWidget):
 
     def set_attacks_visible(self, visible: bool) -> None:
         self.overlay.setGeometry(self.rect())
+        self.classification_badge.move(max(0, self.width() - 94), 6)
+        self.classification_badge.raise_()
         self.overlay.setVisible(visible)
         self.overlay.raise_()
         self.overlay.update()
@@ -93,6 +99,16 @@ class ChessBoard(QWidget):
         self.played_highlight = played
         self.best_highlight = best
         self.refresh()
+
+    def set_classification(self, text: str, color: str = "#555555") -> None:
+        self.classification_badge.move(max(0, self.width() - 94), 6)
+        self.classification_badge.setText(text)
+        self.classification_badge.setStyleSheet(
+            f"background: {color}; color: white; font-weight: bold; border-radius: 5px;"
+        )
+        self.classification_badge.setAccessibleName(f"Move classification: {text}")
+        self.classification_badge.setVisible(bool(text))
+        self.classification_badge.raise_()
 
     def refresh(self) -> None:
         destinations = (

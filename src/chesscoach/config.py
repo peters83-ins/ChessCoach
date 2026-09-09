@@ -3,6 +3,7 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from dotenv import load_dotenv
 
@@ -36,3 +37,45 @@ class Settings:
             )
         if not self.openai_model:
             raise ConfigurationError("Set OPENAI_MODEL before requesting AI coaching.")
+
+
+def save_local_settings(path: Path, updates: dict[str, str]) -> None:
+    """Update selected values in a local dotenv file without exposing secrets."""
+    allowed = {"OPENAI_API_KEY", "OPENAI_MODEL", "STOCKFISH_PATH"}
+    if not updates.keys() <= allowed:
+        raise ValueError("Unsupported setting name.")
+    if any("\n" in value or "\r" in value for value in updates.values()):
+        raise ValueError("Settings cannot contain line breaks.")
+    existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    remaining = dict(updates)
+    output: list[str] = []
+    for line in existing:
+        name = line.split("=", 1)[0].strip() if "=" in line else ""
+        if name in remaining:
+            value = remaining.pop(name)
+            if value:
+                output.append(f"{name}={value}")
+            continue
+        output.append(line)
+    output.extend(f"{name}={value}" for name, value in remaining.items() if value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False, newline="\n"
+    ) as temporary:
+        temporary.write("\n".join(output).rstrip() + "\n")
+        temporary_path = Path(temporary.name)
+    temporary_path.replace(path)
+
+
+def apply_process_settings(settings: Settings) -> None:
+    """Apply settings to this process so the UI does not need a restart."""
+    values = {
+        "OPENAI_API_KEY": settings.openai_api_key,
+        "OPENAI_MODEL": settings.openai_model,
+        "STOCKFISH_PATH": settings.stockfish_path,
+    }
+    for name, value in values.items():
+        if value:
+            os.environ[name] = value
+        else:
+            os.environ.pop(name, None)

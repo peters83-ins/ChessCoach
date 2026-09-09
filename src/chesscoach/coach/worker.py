@@ -77,9 +77,13 @@ class CoachWorker(QThread):
             if run_id:
                 self.repository.update_run(run_id, "cancelled", last.completed, last.total)
         except Exception as error:
+            message = str(error)
+            if self.settings.openai_api_key:
+                message = message.replace(self.settings.openai_api_key, "[redacted]")
+            message = message.splitlines()[0][:300]
             if run_id:
-                self.repository.update_run(run_id, "failed", last.completed, last.total, str(error))
-            self.error.emit(self.generation, f"Coach analysis failed: {error}")
+                self.repository.update_run(run_id, "failed", last.completed, last.total, message)
+            self.error.emit(self.generation, f"Coach analysis failed: {message}")
         finally:
             if client is not None:
                 client.close()

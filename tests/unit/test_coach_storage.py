@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
 
@@ -114,7 +115,7 @@ def test_feedback_cache_uses_model_prompt_and_context(tmp_path: Path) -> None:
 
 def test_version_one_feedback_schema_migrates_without_data_loss(tmp_path: Path) -> None:
     path = tmp_path / "old.sqlite3"
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         connection.execute(
             "CREATE TABLE coach_feedback (game_id TEXT, ply INTEGER, provider TEXT, "
             "prompt_version TEXT, data_json TEXT, created_at TEXT, "
@@ -124,7 +125,7 @@ def test_version_one_feedback_schema_migrates_without_data_loss(tmp_path: Path) 
             "INSERT INTO coach_feedback VALUES ('game', 1, 'local', 'v1', '{}', 'now')"
         )
     CoachRepository(path).migrate()
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection:
         columns = tuple(row[1] for row in connection.execute("PRAGMA table_info(coach_feedback)"))
         row = connection.execute(
             "SELECT game_id, model, context_hash FROM coach_feedback"
@@ -135,3 +136,12 @@ def test_version_one_feedback_schema_migrates_without_data_loss(tmp_path: Path) 
     assert "model" in columns and "context_hash" in columns
     assert row == ("game", "", "")
     assert version == 2
+
+
+def test_latest_run_status_supports_resume(tmp_path: Path) -> None:
+    repository = CoachRepository(tmp_path / "games.sqlite3")
+    run_id = repository.start_run("game", AnalysisProfile())
+    repository.update_run(run_id, "cancelled", 3, 10)
+    status = repository.latest_run_status("game")
+    assert status is not None
+    assert (status.state, status.completed, status.total) == ("cancelled", 3, 10)

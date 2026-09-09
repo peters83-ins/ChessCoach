@@ -18,3 +18,12 @@ def create_client(settings: Settings) -> "OpenAI":
     from openai import OpenAI
 
     return OpenAI(api_key=settings.openai_api_key)
+
+
+def test_connection(settings: Settings) -> None:
+    """Verify that the configured key can access the configured model."""
+    client = create_client(settings)
+    try:
+        client.models.retrieve(settings.openai_model)
+    finally:
+        client.close()

@@ -1,8 +1,11 @@
 """Full-game coaching summary, filters, practice, and lesson entry points."""
 
+from collections import Counter
+
 import chess
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QHBoxLayout,
@@ -14,7 +17,9 @@ from PySide6.QtWidgets import (
 )
 
 from chesscoach.chess.game import Game
+from chesscoach.chess.pgn import san_variation
 from chesscoach.coach.models import CoachBundle, Lesson, MoveClassification, PracticeItem
+from chesscoach.coach.scoring import player_accuracy
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.ui.chess_board import ChessBoard
 
@@ -45,9 +50,16 @@ class CoachPanel(QWidget):
         self.ai_status = QLabel("Local coach available")
         self.ai_status.setWordWrap(True)
         layout.addWidget(self.ai_status)
+        self.cloud_toggle = QCheckBox("Use OpenAI for critical-move explanations")
+        self.cloud_toggle.setEnabled(False)
+        self.cloud_toggle.setToolTip(
+            "Sends selected positions and engine facts, not the full game or API key."
+        )
+        layout.addWidget(self.cloud_toggle)
         self.filter = QComboBox()
         self.filter.addItem("My moves", "player")
         self.filter.addItem("Mistakes and blunders", "critical")
+        self.filter.addItem("Both sides", "both")
         self.filter.addItem("All moves", "all")
         layout.addWidget(self.filter)
         self.report = QLabel("Run full-game analysis for coaching and accuracy.")
@@ -71,15 +83,23 @@ class CoachPanel(QWidget):
         self.filter.currentIndexChanged.connect(lambda: self.show_ply(self.current_ply))
 
     def set_ai_ready(self, ready: bool) -> None:
+        self.cloud_toggle.setEnabled(ready)
+        if not ready:
+            self.cloud_toggle.setChecked(False)
         self.ai_status.setText(
             "OpenAI explanations enabled; engine facts remain authoritative."
             if ready
             else "Local coach active. Set OPENAI_API_KEY and OPENAI_MODEL for AI wording."
         )
 
+    @property
+    def use_cloud(self) -> bool:
+        return self.cloud_toggle.isEnabled() and self.cloud_toggle.isChecked()
+
     def clear(self) -> None:
         self.bundle = None
         self.current_ply = 0
+        self.analyze_button.setText("Analyze Full Game")
         self.report.setText("Run full-game analysis for coaching and accuracy.")
         self.feedback.clear()
         self.practice_button.setEnabled(False)
@@ -94,13 +114,21 @@ class CoachPanel(QWidget):
             self.progress.setRange(0, 0)
             self.feedback.setText("Scanning all moves…")
 
+    def set_resumable(self, completed: int, total: int, state: str) -> None:
+        self.analyze_button.setText("Resume Analysis")
+        self.feedback.setText(
+            f"Previous analysis {state} after {completed} of {total} moves. "
+            "Resume reuses every completed cached position."
+        )
+
     def set_progress(self, completed: int, total: int, stage: str) -> None:
         self.progress.setRange(0, max(total, 1))
         self.progress.setValue(completed)
         self.progress.setFormat(f"{stage.title()} · %v / %m")
 
-    def set_bundle(self, bundle: CoachBundle, player_color: str) -> None:
+    def set_bundle(self, bundle: CoachBundle, player_color: str, result: str = "*") -> None:
         self.bundle = bundle
+        self.analyze_button.setText("Analyze Again")
         self.player_color = player_color
         phases = " · ".join(
             f"{phase.phase.value.title()} {phase.accuracy:.1f}%"
@@ -112,8 +140,20 @@ class CoachPanel(QWidget):
             ", ".join(theme.replace("_", " ") for theme in bundle.report.recurring_themes)
             or "none yet"
         )
+        opponent_color = "black" if player_color == "white" else "white"
+        opponent_accuracy = player_accuracy(bundle.analysis.moves, opponent_color)
+        counts = Counter(
+            move.classification.value
+            for move in bundle.analysis.moves
+            if move.mover == player_color
+        )
         self.report.setText(
-            f"{bundle.report.summary}\n{phases}\nCritical plies: {critical} · "
+            f"Game Review · Result {result}\n"
+            f"Chess Coach accuracy: You {bundle.report.accuracy:.1f}% · "
+            f"Opponent {opponent_accuracy:.1f}%\n"
+            f"Your moves: {counts['best']} best · {counts['inaccuracy']} inaccuracies · "
+            f"{counts['mistake']} mistakes · {counts['blunder']} blunders\n"
+            f"{phases}\nCritical plies: {critical} · "
             f"Strongest plies: {strongest}\nRecurring themes: {weaknesses}"
         )
         self.practice_button.setEnabled(bool(bundle.practice))
@@ -142,7 +182,7 @@ class CoachPanel(QWidget):
         if feedback is None:
             self.feedback.setText("No feedback is stored for this move.")
             return
-        line = " ".join(feedback.continuation) or "—"
+        line = san_variation(move.fen, feedback.continuation) or "—"
         self.feedback.setText(
             f"{feedback.verdict} · {move.accuracy:.1f}%\n"
             f"{feedback.explanation}\nLine: {line}\nTakeaway: {feedback.takeaway}"
@@ -197,7 +237,7 @@ class PracticeDialog(QDialog):
         hints = (
             f"Theme: {self.item.theme.replace('_', ' ')}.",
             f"Candidate move: {board.san(first)}.",
-            f"Engine line: {_san_line(board, self.item.solution)}",
+            f"Engine line: {san_variation(board.fen(), self.item.solution)}",
         )
         self.prompt.setText(hints[self.hint_level - 1])
 
@@ -247,14 +287,3 @@ class LessonsDialog(QDialog):
         if 0 <= index < len(self.lessons):
             self.repository.set_lesson_completed(self.lessons[index].id)
             self.content.setText(self.content.text() + "\n\nCompleted.")
-
-
-def _san_line(board: chess.Board, moves: tuple[str, ...]) -> str:
-    san = []
-    for uci in moves:
-        move = chess.Move.from_uci(uci)
-        if move not in board.legal_moves:
-            break
-        san.append(board.san(move))
-        board.push(move)
-    return " ".join(san)

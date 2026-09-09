@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from collections.abc import Iterator
+from contextlib import closing
 from pathlib import Path
 
 import chess
@@ -132,10 +133,10 @@ def test_completed_game_autosave_and_manual_retry(bot: tuple[MainWindow, FakeRun
     human_move(window, "g2", "g4")
     runner.respond("d8h4")
     assert window.game.status().game_over
-    assert window.statusBar().currentMessage() == "Game saved."
+    assert window.statusBar().currentMessage() == "Game saved. Choose Review Game to learn from it."
     assert not window.undo_button.isEnabled()
     window.save_button.click()
-    with sqlite3.connect(window.database.path) as connection:
+    with closing(sqlite3.connect(window.database.path)) as connection:
         rows = connection.execute("SELECT data_json FROM games").fetchall()
     assert len(rows) == 1
     data = json.loads(rows[0][0])
@@ -198,7 +199,7 @@ def test_load_saved_game_for_analysis(
     assert not window.active
     assert not window.setup.isEnabled()
     assert window.board.preview_only
-    assert window.statusBar().currentMessage() == "Saved game loaded."
+    assert window.statusBar().currentMessage() == "Saved game loaded for review."
     assert window.review_panel.slider.maximum() == 2
     assert window.review_panel.slider.value() == 2
 
