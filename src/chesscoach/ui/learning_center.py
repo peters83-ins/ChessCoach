@@ -114,10 +114,13 @@ class PracticeQueueDialog(QDialog):
         repository: CoachRepository,
         parent: QWidget | None = None,
         catalog: CourseCatalog | None = None,
+        *,
+        initial_theme: str | None = None,
     ) -> None:
         super().__init__(parent)
         self.repository = repository
         self.catalog = catalog or CourseCatalog()
+        self.initial_theme = initial_theme
         self._personal: tuple[PracticeItem, ...] = ()
         self._daily: tuple[LearningItem, ...] = ()
         self._daily_all: tuple[LearningItem, ...] = ()
@@ -204,6 +207,10 @@ class PracticeQueueDialog(QDialog):
         self.theme_filter.addItem("All themes", "")
         for theme in themes:
             self.theme_filter.addItem(theme.replace("_", " ").title(), theme)
+        if self.initial_theme:
+            index = self.theme_filter.findData(self.initial_theme)
+            if index >= 0:
+                self.theme_filter.setCurrentIndex(index)
         self.theme_filter.blockSignals(False)
         self._apply_filters()
 

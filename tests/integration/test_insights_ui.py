@@ -19,6 +19,7 @@ def test_insights_panel_has_local_summary_and_empty_chart(
     assert dialog.themes.rowCount() == 0
     assert "five qualifying" in dialog.transfer.text()
     assert dialog.mastery.value() == 0
+    assert not dialog.practice_theme.isEnabled()
     dialog.close()
 
 

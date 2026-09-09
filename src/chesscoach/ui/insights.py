@@ -33,6 +33,7 @@ from chesscoach.storage.database import GameDatabase
 
 class InsightsDialog(QDialog):
     example_requested = Signal(str, int)
+    theme_practice_requested = Signal(str)
 
     def __init__(
         self,
@@ -70,6 +71,10 @@ class InsightsDialog(QDialog):
         self.open_example.setEnabled(False)
         self.open_example.clicked.connect(self._open_example)
         layout.addWidget(self.open_example)
+        self.practice_theme = QPushButton("Practice selected theme")
+        self.practice_theme.setEnabled(False)
+        self.practice_theme.clicked.connect(self._practice_theme)
+        layout.addWidget(self.practice_theme)
         layout.addWidget(QLabel("Accuracy by game phase (analyzed player moves)"))
         self.phases = QTableWidget(0, 3)
         self.phases.setHorizontalHeaderLabels(("Phase", "Accuracy", "Moves"))
@@ -231,6 +236,7 @@ class InsightsDialog(QDialog):
     def _update_example_button(self) -> None:
         theme = self._selected_theme()
         self.open_example.setEnabled(bool(theme and self._theme_examples.get(theme, ())))
+        self.practice_theme.setEnabled(theme is not None)
 
     def _open_example(self) -> None:
         theme = self._selected_theme()
@@ -238,6 +244,11 @@ class InsightsDialog(QDialog):
         if examples:
             game_id, ply = examples[0]
             self.example_requested.emit(game_id, ply)
+
+    def _practice_theme(self) -> None:
+        theme = self._selected_theme()
+        if theme is not None:
+            self.theme_practice_requested.emit(theme)
 
     def _selected_theme(self) -> str | None:
         rows = self.themes.selectionModel().selectedRows()
