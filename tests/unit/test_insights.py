@@ -1,7 +1,13 @@
 from datetime import UTC, datetime, timedelta
 
 from chesscoach.chess.openings import OpeningMatch
-from chesscoach.coach.insights import opening_stats, recency_weighted_average, recommend_next_action
+from chesscoach.coach.insights import (
+    opening_stats,
+    recency_weighted_average,
+    recommend_next_action,
+    theme_frequency,
+    transfer_metric,
+)
 
 
 def test_opening_stats_require_five_games():
@@ -21,3 +27,10 @@ def test_recommendation_prioritizes_due_then_weakness():
     assert recommend_next_action(3, "fork", 10).startswith("Complete 3")
     assert "fork" in recommend_next_action(0, "fork", 10)
     assert "latest" in recommend_next_action(0, "", 2)
+
+
+def test_theme_frequency_and_transfer_threshold():
+    assert theme_frequency(("fork", "pin", "fork")) == (("fork", 2), ("pin", 1))
+    assert transfer_metric("fork", (True,) * 4, (True,) * 5) is None
+    metric = transfer_metric("fork", (False,) * 5, (True,) * 5)
+    assert metric is not None and metric.delta == 1.0
