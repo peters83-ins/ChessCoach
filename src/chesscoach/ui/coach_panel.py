@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from chesscoach.chess.game import Game
+from chesscoach.chess.openings import recognize_opening
 from chesscoach.chess.pgn import san_variation
 from chesscoach.coach.models import CoachBundle, Lesson, MoveClassification, PracticeItem
 from chesscoach.coach.scoring import player_accuracy
@@ -35,6 +36,7 @@ class CoachPanel(QWidget):
         self.bundle: CoachBundle | None = None
         self.player_color = "white"
         self.current_ply = 0
+        self.opening_summary = "Opening: not identified"
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         controls = QHBoxLayout()
@@ -106,6 +108,18 @@ class CoachPanel(QWidget):
         self.lessons_button.setEnabled(False)
         self.set_running(False)
 
+    def set_game_context(self, moves: tuple[str, ...]) -> None:
+        opening = recognize_opening(moves)
+        if opening is None:
+            self.opening_summary = "Opening: not identified"
+            return
+        departure = (
+            f" · first move outside this local line: ply {opening.book_plies + 1}"
+            if len(moves) > opening.book_plies
+            else " · remained in the recognized local line"
+        )
+        self.opening_summary = f"Opening: {opening.eco} {opening.display_name}{departure}"
+
     def set_running(self, running: bool) -> None:
         self.analyze_button.setEnabled(not running)
         self.cancel_button.setVisible(running)
@@ -153,6 +167,7 @@ class CoachPanel(QWidget):
             f"Opponent {opponent_accuracy:.1f}%\n"
             f"Your moves: {counts['best']} best · {counts['inaccuracy']} inaccuracies · "
             f"{counts['mistake']} mistakes · {counts['blunder']} blunders\n"
+            f"{self.opening_summary}\n"
             f"{phases}\nCritical plies: {critical} · "
             f"Strongest plies: {strongest}\nRecurring themes: {weaknesses}"
         )

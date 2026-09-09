@@ -1,11 +1,12 @@
 """Match setup, human/engine turns, and explicit persistence feedback."""
 
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
 
 import chess
 from PySide6.QtCore import QSettings, QStandardPaths, Qt, QTimer
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QScrollArea,
+    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -98,6 +100,25 @@ class MainWindow(QMainWindow):
         self.first_run_wizard: FirstRunWizard | None = None
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
+        navigation = QToolBar("Navigation", self)
+        navigation.setMovable(False)
+        navigation.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.addToolBar(navigation)
+        self.play_action = QAction("Play", self)
+        self.games_action = QAction("Games", self)
+        self.review_action = QAction("Review", self)
+        self.practice_action = QAction("Practice", self)
+        self.lessons_action = QAction("Lessons", self)
+        self.settings_action = QAction("Settings", self)
+        for action in (
+            self.play_action,
+            self.games_action,
+            self.review_action,
+            self.practice_action,
+            self.lessons_action,
+            self.settings_action,
+        ):
+            navigation.addAction(action)
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
@@ -201,6 +222,12 @@ class MainWindow(QMainWindow):
         self.diagnostics_button.clicked.connect(self.open_diagnostics)
         self.board.game_changed.connect(self.position_changed)
         self.board.message.connect(self.show_board_message)
+        self.play_action.triggered.connect(self.new_game)
+        self.games_action.triggered.connect(self.load_saved_game)
+        self.review_action.triggered.connect(self.open_review_destination)
+        self.practice_action.triggered.connect(self.open_practice)
+        self.lessons_action.triggered.connect(self.open_lessons)
+        self.settings_action.triggered.connect(self.open_settings)
         self.refresh()
 
     def show_board_message(self, message: str) -> None:
@@ -435,7 +462,23 @@ class MainWindow(QMainWindow):
         if not games:
             self.statusBar().showMessage(f"No saved games found in {self.database.path.parent}")
             return
-        dialog = SavedGamesDialog(games, str(self.database.path), self)
+        statuses = self.coach_repository.game_learning_statuses(tuple(game.id for game in games))
+        games = tuple(
+            replace(
+                game,
+                analyzed=status.analyzed if status is not None else False,
+                practice_count=status.practice_count if status is not None else 0,
+            )
+            for game in games
+            for status in (statuses.get(game.id),)
+        )
+        dialog = SavedGamesDialog(
+            games,
+            str(self.database.path),
+            self,
+            delete_game=self.delete_saved_game,
+            export_game=self.export_saved_game,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         game_id = dialog.selected_game_id()
@@ -451,6 +494,37 @@ class MainWindow(QMainWindow):
             return
         self.open_review(data)
 
+    def open_review_destination(self) -> None:
+        if self.review is not None:
+            self.review_panel.setFocus()
+        elif self.match is not None and self.game.status().game_over:
+            self.review_current_game()
+        else:
+            self.load_saved_game()
+
+    def delete_saved_game(self, game_id: str) -> bool:
+        try:
+            deleted = self.database.delete_game(game_id)
+            if deleted:
+                self.coach_repository.delete_game_learning(game_id)
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Delete failed: {error}")
+            return False
+        self.statusBar().showMessage("Saved game deleted." if deleted else "Game not found.")
+        return deleted
+
+    def export_saved_game(self, game_id: str, path: Path) -> bool:
+        try:
+            data = self.database.load_game(game_id)
+            if data is None:
+                raise ValueError("Game not found.")
+            path.write_text(data.pgn, encoding="utf-8")
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Export failed: {error}")
+            return False
+        self.statusBar().showMessage(f"PGN exported to {path}")
+        return True
+
     def open_review(self, data: GameData, *, auto_analyze: bool = False) -> None:
         """Open validated saved data in the reusable review workspace."""
         try:
@@ -465,6 +539,7 @@ class MainWindow(QMainWindow):
         self.review_cache.clear()
         self.coach_bundle = CoachPipeline(self.coach_repository).load(data)
         self.coach_panel.clear()
+        self.coach_panel.set_game_context(data.moves)
         self.review_details = (
             f"Saved game for analysis · Player {data.player_color.title()} · "
             f"Bot {data.bot_elo} · Result {data.result}"

@@ -9,6 +9,7 @@ from pathlib import Path
 import chess
 
 from chesscoach.chess.game import Game
+from chesscoach.chess.openings import recognize_opening
 from chesscoach.chess.pgn import export_pgn
 
 
@@ -107,6 +108,9 @@ class SavedGameSummary:
     bot_elo: int
     result: str
     move_count: int
+    opening: str = "Unknown opening"
+    analyzed: bool = False
+    practice_count: int = 0
 
 
 class GameDatabase:
@@ -141,7 +145,17 @@ class GameDatabase:
             for game_id, saved_at, color, elo, result, data_json in rows:
                 data = self._decode(data_json)
                 games[game_id] = SavedGameSummary(
-                    game_id, saved_at, color, elo, result, len(data.moves)
+                    game_id,
+                    saved_at,
+                    color,
+                    elo,
+                    result,
+                    len(data.moves),
+                    (
+                        opening.display_name
+                        if (opening := recognize_opening(data.moves))
+                        else "Unknown opening"
+                    ),
                 )
         return tuple(sorted(games.values(), key=lambda game: game.saved_at, reverse=True))
 
@@ -212,3 +226,13 @@ class GameDatabase:
         except (OSError, sqlite3.Error, ValueError) as error:
             return SaveResult(False, error=str(error))
         return SaveResult(True, game_id=game_data.id)
+
+    def delete_game(self, game_id: str) -> bool:
+        """Delete a game and its move rows from the database that contains it."""
+        deleted = False
+        for path in self._read_paths():
+            with closing(sqlite3.connect(path, timeout=2.0)) as connection, connection:
+                connection.execute("PRAGMA foreign_keys = ON")
+                cursor = connection.execute("DELETE FROM games WHERE id=?", (game_id,))
+                deleted = cursor.rowcount > 0 or deleted
+        return deleted

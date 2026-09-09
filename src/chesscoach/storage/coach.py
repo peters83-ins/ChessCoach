@@ -37,6 +37,12 @@ class AnalysisRunStatus:
     error: str = ""
 
 
+@dataclass(frozen=True)
+class GameLearningStatus:
+    analyzed: bool
+    practice_count: int
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -223,6 +229,68 @@ class CoachRepository:
         return (
             AnalysisRunStatus(str(row[0]), int(row[1]), int(row[2]), str(row[3])) if row else None
         )
+
+    def game_learning_statuses(self, game_ids: tuple[str, ...]) -> dict[str, GameLearningStatus]:
+        """Return library badges without loading full analyses or practice records."""
+        if not game_ids or not self.path.is_file():
+            return {}
+        self.migrate()
+        placeholders = ",".join("?" for _ in game_ids)
+        with closing(sqlite3.connect(self.path)) as connection:
+            analyzed = {
+                str(row[0])
+                for row in connection.execute(
+                    f"SELECT DISTINCT game_id FROM analysis_runs WHERE state='complete' "
+                    f"AND game_id IN ({placeholders})",
+                    game_ids,
+                )
+            }
+            practice = {
+                str(row[0]): int(row[1])
+                for row in connection.execute(
+                    f"SELECT source_game_id, COUNT(*) FROM practice_items "
+                    f"WHERE source_game_id IN ({placeholders}) GROUP BY source_game_id",
+                    game_ids,
+                )
+            }
+        return {
+            game_id: GameLearningStatus(game_id in analyzed, practice.get(game_id, 0))
+            for game_id in game_ids
+        }
+
+    def delete_game_learning(self, game_id: str) -> None:
+        """Remove analysis and learning records that belong only to a deleted game."""
+        if not self.path.is_file():
+            return
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            practice_ids = tuple(
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT id FROM practice_items WHERE source_game_id=?", (game_id,)
+                )
+            )
+            if practice_ids:
+                placeholders = ",".join("?" for _ in practice_ids)
+                connection.execute(
+                    f"DELETE FROM practice_attempts WHERE item_id IN ({placeholders})",
+                    practice_ids,
+                )
+            connection.execute("DELETE FROM practice_items WHERE source_game_id=?", (game_id,))
+            connection.execute("DELETE FROM weakness_events WHERE game_id=?", (game_id,))
+            connection.execute("DELETE FROM coach_feedback WHERE game_id=?", (game_id,))
+            run_ids = tuple(
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT id FROM analysis_runs WHERE game_id=?", (game_id,)
+                )
+            )
+            if run_ids:
+                placeholders = ",".join("?" for _ in run_ids)
+                connection.execute(
+                    f"DELETE FROM move_analyses WHERE run_id IN ({placeholders})", run_ids
+                )
+            connection.execute("DELETE FROM analysis_runs WHERE game_id=?", (game_id,))
 
     def save_analysis(self, run_id: str, analysis: GameAnalysis) -> None:
         with closing(sqlite3.connect(self.path)) as connection, connection:
