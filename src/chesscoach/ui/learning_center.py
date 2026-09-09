@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -118,6 +120,7 @@ class PracticeQueueDialog(QDialog):
         self.catalog = catalog or CourseCatalog()
         self._personal: tuple[PracticeItem, ...] = ()
         self._daily: tuple[LearningItem, ...] = ()
+        self._daily_all: tuple[LearningItem, ...] = ()
         self._personal_by_id: dict[str, PracticeItem] = {}
         self._course_by_id: dict[str, tuple[Course, CourseExercise]] = {}
         self.setWindowTitle("Practice Queue")
@@ -126,12 +129,24 @@ class PracticeQueueDialog(QDialog):
         self.progress = QLabel()
         self.progress.setWordWrap(True)
         layout.addWidget(self.progress)
+        self.completion = QLabel()
+        self.completion.setWordWrap(True)
+        layout.addWidget(self.completion)
         note = QLabel(
             "Personal positions also reinforce the lesson concept. Correct follow-up moves "
             "measure progress on that same theme."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
+        filters = QHBoxLayout()
+        filters.addWidget(QLabel("Theme"))
+        self.theme_filter = QComboBox()
+        self.theme_filter.addItem("All themes", "")
+        filters.addWidget(self.theme_filter)
+        self.failed_filter = QCheckBox("Previously failed")
+        filters.addWidget(self.failed_filter)
+        filters.addStretch(1)
+        layout.addLayout(filters)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(("Source", "Theme", "Due", "Action"))
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -145,11 +160,12 @@ class PracticeQueueDialog(QDialog):
         actions.addWidget(close)
         layout.addLayout(actions)
         self.start_button.clicked.connect(self._start)
+        self.theme_filter.currentIndexChanged.connect(self._apply_filters)
+        self.failed_filter.toggled.connect(self._apply_filters)
         close.clicked.connect(self.accept)
         self.refresh()
 
     def refresh(self) -> None:
-        progress = self.repository.practice_progress()
         now = datetime.now(UTC).isoformat()
         self._personal = tuple(
             item for item in self.repository.practice_items() if item.due_at <= now
@@ -181,7 +197,33 @@ class PracticeQueueDialog(QDialog):
         personal_items = tuple(
             LearningItem("personal", item.id, item.theme) for item in self._personal
         )
-        self._daily = compose_daily_session(personal_items, tuple(course_items), concepts)
+        self._daily_all = compose_daily_session(personal_items, tuple(course_items), concepts)
+        themes = sorted({item.theme for item in self._daily_all})
+        self.theme_filter.blockSignals(True)
+        self.theme_filter.clear()
+        self.theme_filter.addItem("All themes", "")
+        for theme in themes:
+            self.theme_filter.addItem(theme.replace("_", " ").title(), theme)
+        self.theme_filter.blockSignals(False)
+        self._apply_filters()
+
+    def _apply_filters(self) -> None:
+        progress = self.repository.practice_progress()
+        theme = str(self.theme_filter.currentData())
+        failed = (
+            self.repository.previously_failed_practice_ids()
+            if self.failed_filter.isChecked()
+            else frozenset()
+        )
+        self._daily = tuple(
+            item
+            for item in self._daily_all
+            if (not theme or item.theme == theme)
+            and (
+                not self.failed_filter.isChecked()
+                or (item.source == "personal" and item.identifier in failed)
+            )
+        )
         counts = {
             source: sum(item.source == source for item in self._daily)
             for source in ("personal", "course", "concept")
@@ -190,6 +232,11 @@ class PracticeQueueDialog(QDialog):
             f"Due today: {progress.due} · Daily session: {len(self._daily)}/10 · "
             f"Personal {counts['personal']} · Courses {counts['course']} · "
             f"Concepts {counts['concept']}"
+        )
+        self.completion.setText(
+            "Session complete — choose another theme or return later."
+            if not self._daily and self._daily_all
+            else ""
         )
         self.table.setRowCount(len(self._daily))
         for row, item in enumerate(self._daily):

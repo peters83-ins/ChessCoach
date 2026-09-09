@@ -661,6 +661,20 @@ class CoachRepository:
             ).fetchone()
         return PracticeProgress(int(total), int(due or 0), int(attempted), int(successful))
 
+    def previously_failed_practice_ids(
+        self, profile_id: str = DEFAULT_PROFILE_ID
+    ) -> frozenset[str]:
+        """Return practice items with at least one unsuccessful attempt."""
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(
+                "SELECT DISTINCT item_id FROM practice_attempts "
+                "WHERE successful=0 AND item_id IN "
+                "(SELECT id FROM practice_items WHERE profile_id=?)",
+                (profile_id,),
+            ).fetchall()
+        return frozenset(str(row[0]) for row in rows)
+
     def lessons(self, profile_id: str = DEFAULT_PROFILE_ID) -> tuple[Lesson, ...]:
         self.migrate()
         with closing(sqlite3.connect(self.path)) as connection:

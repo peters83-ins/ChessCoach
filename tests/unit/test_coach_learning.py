@@ -9,10 +9,12 @@ from chesscoach.coach.models import (
     GamePhase,
     MoveAnalysis,
     MoveClassification,
+    PracticeItem,
     WeaknessEvent,
 )
 from chesscoach.coach.practice import generate_practice_items, schedule_attempt
 from chesscoach.coach.weakness import aggregate_weaknesses, weakness_events
+from chesscoach.storage.coach import CoachRepository
 
 
 def mistake() -> MoveAnalysis:
@@ -75,3 +77,14 @@ def test_one_game_cannot_dominate_a_weakness() -> None:
     scores = {item.theme: item for item in aggregate_weaknesses(events, now=now)}
     assert scores["fork"].score == 3
     assert scores["fork"].occurrences == 1
+
+
+def test_repository_tracks_previously_failed_practice_items(tmp_path) -> None:
+    repository = CoachRepository(tmp_path / "coach.sqlite3")
+    item = PracticeItem(
+        "item", "default", "game", 1, chess.STARTING_FEN, "fork", ("e2e4",), due_at=""
+    )
+    repository.save_learning((), (item,), ())
+    assert repository.previously_failed_practice_ids() == frozenset()
+    repository.record_practice_attempt(item, "f2f3", False)
+    assert repository.previously_failed_practice_ids() == frozenset({"item"})
