@@ -4,7 +4,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from chesscoach.chess.openings import OpeningMatch, OpeningStatistic, aggregate_openings
+from chesscoach.chess.openings import (
+    OpeningMatch,
+    OpeningStatistic,
+    aggregate_openings,
+    recognize_opening,
+)
 from chesscoach.coach.models import MoveAnalysis
 
 
@@ -134,6 +139,31 @@ def phase_transfer(
         for phase, (recent, prior) in sorted(grouped.items())
         if len(recent) >= minimum and len(prior) >= minimum
     )
+
+
+def opening_departure_transfer(
+    records: Iterable[tuple[tuple[str, ...], datetime]],
+    *,
+    now: datetime | None = None,
+    minimum: int = 3,
+) -> tuple[float, float, int] | None:
+    """Compare the fraction of each game that follows a reviewed opening line."""
+    current = now or datetime.now(UTC)
+    recent: list[float] = []
+    prior: list[float] = []
+    for moves, observed in records:
+        opening = recognize_opening(moves)
+        if opening is None or not moves:
+            continue
+        rate = opening.book_plies / len(moves)
+        age_days = (current - observed).total_seconds() / 86400
+        if 0 <= age_days <= 45:
+            recent.append(rate)
+        elif age_days > 45:
+            prior.append(rate)
+    if len(recent) < minimum or len(prior) < minimum:
+        return None
+    return sum(recent) / len(recent), sum(prior) / len(prior), len(recent) + len(prior)
 
 
 def analyzed_theme_counts(moves: Iterable[MoveAnalysis]) -> tuple[tuple[str, int], ...]:
