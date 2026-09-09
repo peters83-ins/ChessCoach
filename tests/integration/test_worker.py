@@ -2,6 +2,7 @@ from threading import Event
 
 import chess
 import pytest
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from chesscoach.engine.worker import EngineRunner
@@ -73,3 +74,28 @@ def test_malformed_engine_output_reports_a_retryable_error(
     finally:
         runner.shutdown()
     assert errors and "no evaluation" in errors[0]
+
+
+def test_engine_startup_failure_reports_a_retryable_error(
+    app: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    finished = Event()
+
+    class CrashingEngine:
+        def __init__(self, path: str) -> None:
+            raise OSError("engine process exited during startup")
+
+    monkeypatch.setattr("chesscoach.engine.worker.Stockfish", CrashingEngine)
+    runner = EngineRunner()
+    errors: list[str] = []
+    runner.error.connect(lambda message: (errors.append(message), finished.set()))
+    runner.search(chess.Board(), "broken", 1200, False)
+    try:
+        deadline = 40
+        while not finished.is_set() and deadline:
+            app.processEvents()
+            QTest.qWait(50)
+            deadline -= 1
+    finally:
+        runner.shutdown()
+    assert errors and "startup" in errors[0]
