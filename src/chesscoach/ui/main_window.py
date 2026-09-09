@@ -31,7 +31,7 @@ from chesscoach.config import Settings
 from chesscoach.engine.analysis import PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
 from chesscoach.storage.coach import CoachRepository
-from chesscoach.storage.database import GameDatabase
+from chesscoach.storage.database import GameData, GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
 from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog, PracticeDialog
@@ -39,7 +39,7 @@ from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.game_review import GameReview
 from chesscoach.ui.match_setup import MatchSetup
-from chesscoach.ui.move_history import MoveHistory
+from chesscoach.ui.move_history import BADGES, MoveHistory
 from chesscoach.ui.saved_games import SavedGamesDialog
 from chesscoach.ui.settings_dialog import SettingsDialog
 
@@ -64,10 +64,17 @@ class MainWindow(QMainWindow):
         self.review_cache: dict[str, PositionAnalysis] = {}
         self.coach_bundle: CoachBundle | None = None
         self.coach_running = False
+        self.retry_ply: int | None = None
+        self.retry_hint_level = 0
+        self.line_games: list[Game] = []
+        self.line_step = 0
         self.review_timer = QTimer(self)
         self.review_timer.setSingleShot(True)
         self.review_timer.setInterval(150)
         self.review_timer.timeout.connect(self.analyze_review_position)
+        self.line_timer = QTimer(self)
+        self.line_timer.setInterval(650)
+        self.line_timer.timeout.connect(self.advance_best_line)
         self.runner = runner if runner is not None else EngineRunner(self)
         self.runner.result.connect(self.engine_result)
         self.runner.error.connect(self.engine_error)
@@ -128,6 +135,9 @@ class MainWindow(QMainWindow):
         sidebar.addWidget(self.attack_toggle)
         self.review_panel = GameReview()
         self.review_panel.index_changed.connect(self.set_review_index)
+        self.review_panel.show_line_requested.connect(self.toggle_best_line)
+        self.review_panel.retry_requested.connect(self.toggle_retry_move)
+        self.review_panel.hint_requested.connect(self.show_retry_hint)
         self.review_panel.hide()
         sidebar.addWidget(self.review_panel)
         self.coach_panel = CoachPanel()
@@ -144,6 +154,7 @@ class MainWindow(QMainWindow):
         self.engine_label.setWordWrap(True)
         sidebar.addWidget(self.engine_label)
         self.history = MoveHistory()
+        self.history.move_selected.connect(self.set_review_index)
         sidebar.addWidget(self.history, 1)
         self.storage_label = QLabel(f"Saved games: {self.database.path}")
         self.storage_label.setWordWrap(True)
@@ -157,6 +168,8 @@ class MainWindow(QMainWindow):
         self.save_button.setToolTip(str(self.database.path))
         self.load_button = QPushButton("Load Saved Game")
         self.retry_button = QPushButton("Retry Engine")
+        self.review_game_button = QPushButton("Review Game")
+        self.review_game_button.hide()
         self.settings_button = QPushButton("Settings")
         for button in (
             self.new_game_button,
@@ -166,6 +179,7 @@ class MainWindow(QMainWindow):
             self.save_button,
             self.load_button,
             self.retry_button,
+            self.review_game_button,
             self.settings_button,
         ):
             sidebar.addWidget(button)
@@ -176,6 +190,7 @@ class MainWindow(QMainWindow):
         self.save_button.clicked.connect(self.save_match)
         self.load_button.clicked.connect(self.load_saved_game)
         self.retry_button.clicked.connect(self.retry_engine)
+        self.review_game_button.clicked.connect(self.review_current_game)
         self.settings_button.clicked.connect(self.open_settings)
         self.board.game_changed.connect(self.position_changed)
         self.board.message.connect(self.show_board_message)
@@ -219,6 +234,8 @@ class MainWindow(QMainWindow):
             else "Choose color and difficulty, then Start Match."
         )
         self.history.set_moves(self.review.history if self.review else self.game.history())
+        if self.coach_bundle is not None:
+            self.history.set_classifications(self.coach_bundle.analysis.moves)
         human_turn = self.match is None or self.game.turn == self.match.player_color
         self.board.input_allowed = self.active and human_turn
         self.board.preview_only = not self.active
@@ -239,6 +256,9 @@ class MainWindow(QMainWindow):
         self.retry_button.setEnabled(
             self.engine_failed
             and ((self.match is not None and not status.game_over) or self.review is not None)
+        )
+        self.review_game_button.setVisible(
+            self.match is not None and status.game_over and bool(self.game.history())
         )
         self.board.refresh()
 
@@ -263,6 +283,8 @@ class MainWindow(QMainWindow):
         self.coach_running = False
         self.coach_runner.cancel()
         self.review_timer.stop()
+        self.line_timer.stop()
+        self.retry_ply = None
         self.review_panel.hide()
         self.coach_panel.clear()
         self.coach_panel.hide()
@@ -287,6 +309,9 @@ class MainWindow(QMainWindow):
         self.request_engine()
 
     def position_changed(self) -> None:
+        if self.retry_ply is not None:
+            self.handle_retry_attempt()
+            return
         if self.match is not None:
             self.match.record_position()
         self.refresh()
@@ -296,6 +321,7 @@ class MainWindow(QMainWindow):
             outcome = self.game.position.outcome()
             self.evaluation_bar.set_result(outcome.winner if outcome else None)
             self.save_match()
+            self.statusBar().showMessage("Game saved. Choose Review Game to learn from it.")
         else:
             self.request_engine()
 
@@ -398,6 +424,10 @@ class MainWindow(QMainWindow):
         if data is None:
             self.statusBar().showMessage("Load failed: game no longer exists.")
             return
+        self.open_review(data)
+
+    def open_review(self, data: GameData, *, auto_analyze: bool = False) -> None:
+        """Open validated saved data in the reusable review workspace."""
         try:
             review = ReviewSession(data)
         except ValueError as error:
@@ -421,14 +451,39 @@ class MainWindow(QMainWindow):
         self.review_panel.show()
         self.coach_panel.show()
         if self.coach_bundle is not None:
-            self.coach_panel.set_bundle(self.coach_bundle, data.player_color)
+            self.coach_panel.set_bundle(self.coach_bundle, data.player_color, data.result)
+            self.review_panel.set_analysis(self.coach_bundle.analysis, data.player_color)
+        else:
+            self.review_panel.set_analysis(None, data.player_color)
         self.review_panel.configure(review.total)
-        self.set_review_index(review.total)
-        self.statusBar().showMessage("Saved game loaded.")
+        self.set_review_index(0 if auto_analyze else review.total)
+        self.statusBar().showMessage("Saved game loaded for review.")
+        if auto_analyze:
+            self.start_coach_analysis()
+
+    def review_current_game(self) -> None:
+        """Save a completed match and enter guided review in one action."""
+        if self.match is None or not self.game.status().game_over:
+            return
+        match_id = self.match.id
+        if not self.save_match():
+            return
+        try:
+            data = self.database.load_game(match_id)
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Review failed: {error}")
+            return
+        if data is None:
+            self.statusBar().showMessage("Review failed: the saved game could not be reopened.")
+            return
+        self.open_review(data, auto_analyze=True)
 
     def set_review_index(self, index: int) -> None:
         if self.review is None:
             return
+        if self.retry_ply is not None:
+            return
+        self.stop_best_line()
         self.runner.cancel()
         self.review_timer.stop()
         self.engine_failed = False
@@ -445,6 +500,7 @@ class MainWindow(QMainWindow):
             else "—"
         )
         self.board.set_review_moves(move, None)
+        self.board.set_classification("")
         self.evaluation_bar.clear()
         self.review_panel.set_details(played_text, "—", "—")
         self.engine_label.clear()
@@ -519,6 +575,8 @@ class MainWindow(QMainWindow):
         )
         self.review_panel.set_details(played_text, analyzed.best_san, evaluation)
         self.board.set_review_moves(played[0], best)
+        badge, color = BADGES[analyzed.classification]
+        self.board.set_classification(f"{analyzed.classification.value.title()} {badge}", color)
         self.evaluation_bar.set_score(pov_score(score))
         self.engine_label.setText(
             f"{analyzed.classification.value.title()} · {analyzed.accuracy:.1f}% move accuracy"
@@ -551,8 +609,10 @@ class MainWindow(QMainWindow):
             return
         self.coach_running = False
         self.coach_bundle = bundle
-        self.coach_panel.set_bundle(bundle, self.review.data.player_color)
-        self.set_review_index(self.review.index)
+        self.coach_panel.set_bundle(bundle, self.review.data.player_color, self.review.data.result)
+        self.review_panel.set_analysis(bundle.analysis, self.review.data.player_color)
+        self.history.set_classifications(bundle.analysis.moves)
+        self.set_review_index(0)
         self.statusBar().showMessage("Full-game coaching analysis complete.")
 
     def coach_error(self, message: str) -> None:
@@ -565,6 +625,134 @@ class MainWindow(QMainWindow):
         self.coach_running = False
         self.coach_panel.set_running(False)
         self.coach_panel.feedback.setText("Analysis cancelled; completed positions remain cached.")
+
+    def toggle_best_line(self) -> None:
+        """Play or hide the stored engine continuation for the selected move."""
+        if self.line_timer.isActive() or self.line_games:
+            self.stop_best_line(restore=True)
+            return
+        if self.review is None or self.coach_bundle is None or self.review.index == 0:
+            self.statusBar().showMessage("Choose an analyzed move to show its best line.")
+            return
+        analyzed = self.coach_bundle.analysis.moves[self.review.index - 1]
+        board = chess.Board(analyzed.fen)
+        game = Game(analyzed.fen)
+        games = [game.copy()]
+        for uci in analyzed.best_pv:
+            move = chess.Move.from_uci(uci)
+            if move not in board.legal_moves or not game.attempt_move(move):
+                break
+            board.push(move)
+            games.append(game.copy())
+        if len(games) < 2:
+            self.statusBar().showMessage("No stored best line is available for this move.")
+            return
+        self.line_games = games
+        self.line_step = 0
+        self.review_panel.show_line_button.setText("Hide Best Line")
+        self.advance_best_line()
+        self.line_timer.start()
+
+    def advance_best_line(self) -> None:
+        """Advance one cached position without calling Stockfish again."""
+        if self.line_step >= len(self.line_games):
+            self.line_timer.stop()
+            return
+        self.game = self.line_games[self.line_step]
+        self.board.game = self.game
+        self.board.set_review_moves(None, None)
+        self.board.set_classification("Best line", "#7b2f8e")
+        self.board.input_allowed = False
+        self.board.refresh()
+        self.line_step += 1
+
+    def stop_best_line(self, *, restore: bool = False) -> None:
+        """Stop variation playback and optionally restore the selected game ply."""
+        was_showing = bool(self.line_games)
+        self.line_timer.stop()
+        self.line_games = []
+        self.line_step = 0
+        self.review_panel.show_line_button.setText("Show Best Line")
+        if restore and was_showing and self.review is not None:
+            index = self.review.index
+            self.game = self.review.game_at(index)
+            self.board.game = self.game
+            self.set_review_index(index)
+
+    def toggle_retry_move(self) -> None:
+        """Enter or leave an interactive attempt from the pre-move position."""
+        if self.retry_ply is not None:
+            self.finish_retry()
+            return
+        if self.review is None or self.coach_bundle is None or self.review.index == 0:
+            self.statusBar().showMessage("Choose an analyzed move before retrying it.")
+            return
+        analyzed = self.coach_bundle.analysis.moves[self.review.index - 1]
+        self.stop_best_line()
+        self.retry_ply = analyzed.ply
+        self.retry_hint_level = 0
+        self.game = Game(analyzed.fen)
+        self.board.game = self.game
+        self.active = True
+        self.board.set_review_moves(None, None)
+        self.board.set_classification("Retry", "#356f8f")
+        self.review_panel.set_retry_mode(True)
+        self.coach_panel.feedback.setText(
+            "Your turn: find a stronger move. The best move is hidden."
+        )
+        self.refresh()
+
+    def handle_retry_attempt(self) -> None:
+        """Check a legal retry against stored engine-verified candidates."""
+        if self.retry_ply is None or self.coach_bundle is None:
+            return
+        analyzed = self.coach_bundle.analysis.moves[self.retry_ply - 1]
+        attempted = self.game.position.move_stack[-1].uci()
+        accepted = attempted in ((analyzed.best_uci,) + analyzed.alternative_moves)
+        if accepted:
+            self.board.input_allowed = False
+            self.board.set_classification("Correct", "#4d8f55")
+            self.coach_panel.feedback.setText(
+                f"Correct. {analyzed.best_san} keeps the stronger continuation. "
+                "Choose Return to Review when ready."
+            )
+            self.board.refresh()
+            return
+        self.game = Game(analyzed.fen)
+        self.board.game = self.game
+        self.board.clear_selection()
+        self.coach_panel.feedback.setText(
+            "That move is legal, but it misses the engine's main idea. "
+            "Look for checks, captures, and direct threats, or ask for a hint."
+        )
+        self.refresh()
+
+    def show_retry_hint(self) -> None:
+        """Reveal the retry objective, candidate, then stored legal line."""
+        if self.retry_ply is None or self.coach_bundle is None:
+            return
+        analyzed = self.coach_bundle.analysis.moves[self.retry_ply - 1]
+        self.retry_hint_level = min(3, self.retry_hint_level + 1)
+        theme = analyzed.tags[0].replace("_", " ") if analyzed.tags else "candidate moves"
+        hints = (
+            f"Focus on: {theme}.",
+            f"Candidate move: {analyzed.best_san}.",
+            f"Engine line: {' '.join(analyzed.best_pv)}",
+        )
+        self.coach_panel.feedback.setText(hints[self.retry_hint_level - 1])
+
+    def finish_retry(self) -> None:
+        """Return from retry to the exact reviewed move."""
+        if self.retry_ply is None or self.review is None:
+            return
+        ply = self.retry_ply
+        self.retry_ply = None
+        self.retry_hint_level = 0
+        self.active = False
+        self.review_panel.set_retry_mode(False)
+        self.game = self.review.game_at(ply)
+        self.board.game = self.game
+        self.set_review_index(ply)
 
     def open_practice(self) -> None:
         if self.coach_bundle is None or not self.coach_bundle.practice:
@@ -589,6 +777,8 @@ class MainWindow(QMainWindow):
         self.coach_running = False
         self.coach_runner.cancel()
         self.review_timer.stop()
+        self.line_timer.stop()
+        self.retry_ply = None
         self.review_panel.hide()
         self.coach_panel.clear()
         self.coach_panel.hide()

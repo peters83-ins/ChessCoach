@@ -22,6 +22,7 @@ from chesscoach.coach.pipeline import CoachPipeline
 from chesscoach.engine.worker import EngineRunner
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameData, GameDatabase
+from chesscoach.storage.match import BotMatch
 from chesscoach.ui.coach_panel import LessonsDialog, PracticeDialog
 from chesscoach.ui.main_window import MainWindow
 from chesscoach.ui.saved_games import SavedGamesDialog
@@ -131,10 +132,69 @@ def test_analysis_progress_result_and_review_reuse(
     runner.progress.emit(AnalysisProgress(1, 2, "quick"))
     assert window.coach_panel.progress.value() == 1
     runner.result.emit(bundle())
-    assert "Accuracy 82.0%" in window.coach_panel.report.text()
+    assert "Chess Coach accuracy: You 82.0%" in window.coach_panel.report.text()
+    assert window.review.index == 0
+    window.review_panel.next_key_button.click()
+    assert window.review.index == 1
     assert "Mistake" in window.coach_panel.feedback.text()
     assert "82.0% move accuracy" in window.engine_label.text()
     assert window.review_panel.best_label.text() == "Engine best: e4"
+    assert "?" in window.history.item(0, 1).text()
+
+
+def test_best_line_and_retry_restore_review(
+    coach_window: tuple[MainWindow, FakeCoachRunner, GameData],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window, _, game_data = coach_window
+    monkeypatch.setattr(SavedGamesDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+    monkeypatch.setattr(SavedGamesDialog, "selected_game_id", lambda self: game_data.id)
+    window.load_saved_game()
+    window.coach_result(bundle())
+    window.set_review_index(1)
+    window.toggle_best_line()
+    window.line_timer.stop()
+    assert window.line_games
+    assert window.review_panel.show_line_button.text() == "Hide Best Line"
+    window.toggle_best_line()
+    assert window.review_panel.show_line_button.text() == "Show Best Line"
+    assert window.review.index == 1
+
+    window.toggle_retry_move()
+    assert window.retry_ply == 1
+    assert window.board.best_highlight is None
+    window.board.select_square(chess.G1)
+    window.board.select_square(chess.H3)
+    assert "misses the engine's main idea" in window.coach_panel.feedback.text()
+    window.board.select_square(chess.E2)
+    window.board.select_square(chess.E4)
+    assert "Correct" in window.coach_panel.feedback.text()
+    window.toggle_retry_move()
+    assert window.retry_ply is None
+    assert window.review.index == 1
+
+
+def test_completed_match_has_one_click_review(app: QApplication, tmp_path: Path) -> None:
+    game = parse_pgn("1. f3 e5 2. g4 Qh4# 0-1")
+    database = GameDatabase(tmp_path / "games" / "games.sqlite3")
+    coach_runner = FakeCoachRunner()
+    window = MainWindow(
+        game,
+        database=database,
+        runner=FakeEngineRunner(),
+        coach_runner=coach_runner,
+    )
+    window.setup.engine_path.setText("engine")
+    window.match = BotMatch(game, chess.WHITE, 1000)
+    window.show()
+    app.processEvents()
+    window.refresh()
+    assert window.review_game_button.isVisible()
+    window.review_game_button.click()
+    assert window.review is not None
+    assert window.review.index == 0
+    assert coach_runner.requests
+    window.close()
 
 
 def test_interactive_practice_and_lesson_completion(app: QApplication, tmp_path: Path) -> None:

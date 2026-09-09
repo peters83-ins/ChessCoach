@@ -1,5 +1,7 @@
 """Full-game coaching summary, filters, practice, and lesson entry points."""
 
+from collections import Counter
+
 import chess
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -16,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from chesscoach.chess.game import Game
 from chesscoach.coach.models import CoachBundle, Lesson, MoveClassification, PracticeItem
+from chesscoach.coach.scoring import player_accuracy
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.ui.chess_board import ChessBoard
 
@@ -55,6 +58,7 @@ class CoachPanel(QWidget):
         self.filter = QComboBox()
         self.filter.addItem("My moves", "player")
         self.filter.addItem("Mistakes and blunders", "critical")
+        self.filter.addItem("Both sides", "both")
         self.filter.addItem("All moves", "all")
         layout.addWidget(self.filter)
         self.report = QLabel("Run full-game analysis for coaching and accuracy.")
@@ -113,7 +117,7 @@ class CoachPanel(QWidget):
         self.progress.setValue(completed)
         self.progress.setFormat(f"{stage.title()} · %v / %m")
 
-    def set_bundle(self, bundle: CoachBundle, player_color: str) -> None:
+    def set_bundle(self, bundle: CoachBundle, player_color: str, result: str = "*") -> None:
         self.bundle = bundle
         self.player_color = player_color
         phases = " · ".join(
@@ -126,8 +130,20 @@ class CoachPanel(QWidget):
             ", ".join(theme.replace("_", " ") for theme in bundle.report.recurring_themes)
             or "none yet"
         )
+        opponent_color = "black" if player_color == "white" else "white"
+        opponent_accuracy = player_accuracy(bundle.analysis.moves, opponent_color)
+        counts = Counter(
+            move.classification.value
+            for move in bundle.analysis.moves
+            if move.mover == player_color
+        )
         self.report.setText(
-            f"{bundle.report.summary}\n{phases}\nCritical plies: {critical} · "
+            f"Game Review · Result {result}\n"
+            f"Chess Coach accuracy: You {bundle.report.accuracy:.1f}% · "
+            f"Opponent {opponent_accuracy:.1f}%\n"
+            f"Your moves: {counts['best']} best · {counts['inaccuracy']} inaccuracies · "
+            f"{counts['mistake']} mistakes · {counts['blunder']} blunders\n"
+            f"{phases}\nCritical plies: {critical} · "
             f"Strongest plies: {strongest}\nRecurring themes: {weaknesses}"
         )
         self.practice_button.setEnabled(bool(bundle.practice))
