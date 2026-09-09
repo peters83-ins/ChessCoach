@@ -191,3 +191,5 @@ Only selected positions, legal moves, engine lines, classifications, and extract
 evidence are sent; full PGNs and API keys are not stored or transmitted by the
 coaching pipeline. Invalid or unavailable AI output falls back to local feedback.
 See [AI coach architecture](docs/AI_COACH.md) for scoring and extension contracts.
+The prioritized [first-pass product backlog](docs/FIRST_PASS_BACKLOG.md) is the working
+reference for onboarding, review navigation, practice, lessons, and release readiness.
