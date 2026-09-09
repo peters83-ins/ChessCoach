@@ -46,6 +46,7 @@ from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.game_review import GameReview
 from chesscoach.ui.learning_center import PracticeQueueDialog, WeaknessDashboardDialog
+from chesscoach.ui.learning_home import LearningHomeDialog
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import BADGES, MoveHistory
 from chesscoach.ui.saved_games import SavedGamesDialog
@@ -125,6 +126,7 @@ class MainWindow(QMainWindow):
         self.practice_action = QAction("Practice", self)
         self.lessons_action = QAction("Lessons", self)
         self.courses_action = QAction("Courses", self)
+        self.learn_action = QAction("Learn", self)
         self.settings_action = QAction("Settings", self)
         self.play_action.setShortcut(QKeySequence.StandardKey.New)
         self.games_action.setShortcut(QKeySequence.StandardKey.Open)
@@ -132,6 +134,7 @@ class MainWindow(QMainWindow):
         self.practice_action.setShortcut(QKeySequence("Ctrl+P"))
         self.lessons_action.setShortcut(QKeySequence("Ctrl+L"))
         self.courses_action.setShortcut(QKeySequence("Ctrl+Shift+L"))
+        self.learn_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
         self.settings_action.setShortcut(QKeySequence.StandardKey.Preferences)
         for action in (
             self.play_action,
@@ -140,6 +143,7 @@ class MainWindow(QMainWindow):
             self.practice_action,
             self.lessons_action,
             self.courses_action,
+            self.learn_action,
             self.settings_action,
         ):
             navigation.addAction(action)
@@ -253,6 +257,7 @@ class MainWindow(QMainWindow):
         self.practice_action.triggered.connect(self.open_practice)
         self.lessons_action.triggered.connect(self.open_lessons)
         self.courses_action.triggered.connect(self.open_courses)
+        self.learn_action.triggered.connect(self.open_learning_home)
         self.settings_action.triggered.connect(self.open_settings)
         self.apply_preferences(self.preferences)
         self.refresh()
@@ -976,6 +981,27 @@ class MainWindow(QMainWindow):
 
     def open_courses(self) -> None:
         CourseLibraryDialog(self.course_catalog, self.coach_repository, self).exec()
+
+    def open_learning_home(self) -> None:
+        dialog = LearningHomeDialog(
+            self.coach_repository, self.course_catalog, self.database, self
+        )
+        dialog.action_requested.connect(self._learning_action)
+        dialog.exec()
+
+    def _learning_action(self, action: str) -> None:
+        if action == "practice":
+            self.open_practice()
+        elif action == "courses":
+            self.open_courses()
+        elif action == "weaknesses":
+            self.open_weaknesses()
+        elif action == "latest":
+            games = self.database.list_games()
+            if games:
+                data = self.database.load_game(games[0].id)
+                if data is not None:
+                    self.open_review(data)
 
     def open_weaknesses(self) -> None:
         dialog = WeaknessDashboardDialog(self.coach_repository, self)
