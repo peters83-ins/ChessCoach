@@ -3,7 +3,7 @@
 from collections import Counter
 
 import chess
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -21,6 +21,7 @@ from chesscoach.chess.openings import recognize_opening
 from chesscoach.chess.pgn import san_variation
 from chesscoach.coach.models import CoachBundle, Lesson, MoveClassification, PracticeItem
 from chesscoach.coach.scoring import player_accuracy
+from chesscoach.coach.training import TrainingSession
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameDatabase
 from chesscoach.ui.chess_board import ChessBoard
@@ -224,13 +225,17 @@ class PracticeDialog(QDialog):
         self.item = item
         self.repository = repository
         self.hint_level = 0
-        self.solution_index = 0
+        self.session = TrainingSession(item)
+        self.mistake_timer = QTimer(self)
+        self.mistake_timer.setSingleShot(True)
+        self.mistake_timer.setInterval(700)
+        self.mistake_timer.timeout.connect(self._restore_after_mistake)
         self.setWindowTitle(f"Practice · {item.theme.replace('_', ' ').title()}")
         layout = QVBoxLayout(self)
         self.prompt = QLabel("Find the best move.")
         self.prompt.setWordWrap(True)
         layout.addWidget(self.prompt)
-        self.game = Game(item.fen)
+        self.game = self.session.game
         self.board = ChessBoard(self.game)
         self.board.set_orientation(self.game.turn)
         self.board.game_changed.connect(self._attempted)
@@ -250,44 +255,42 @@ class PracticeDialog(QDialog):
 
     def _attempted(self) -> None:
         move = self.game.position.move_stack[-1]
-        expected = self.item.solution[self.solution_index]
-        alternative = self.solution_index == 0 and move.uci() in self.item.alternatives
-        if move.uci() != expected and not alternative:
+        result = self.session.attempt(move)
+        if result.mistake:
             self.item = self.repository.record_practice_attempt(self.item, move.uci(), False)
-            self.prompt.setText("Try again. Check forcing moves before committing.")
-            self.game = Game(self.item.fen)
-            self.board.game = self.game
-            self.solution_index = 0
-            self.board.clear_selection()
+            self.prompt.setText(result.feedback)
+            self.board.set_review_moves(move, None)
+            self.board.set_classification("Mistake", "#b42318")
+            self.board.input_allowed = False
+            self.mistake_timer.start()
             return
-        self.solution_index += 1
-        if alternative:
-            self._complete(move.uci())
-            return
-        if self.solution_index < len(self.item.solution):
-            reply = chess.Move.from_uci(self.item.solution[self.solution_index])
-            if reply in self.game.position.legal_moves:
-                self.game.attempt_move(reply)
-                self.solution_index += 1
-                self.board.clear_selection()
-        if self.solution_index >= len(self.item.solution):
-            self._complete(move.uci())
+        self.game = self.session.game
+        self.board.game = self.game
+        self.board.clear_selection()
+        if result.completed:
+            self.item = self.repository.record_practice_attempt(self.item, move.uci(), True)
+            self.prompt.setText("Correct. This position has been scheduled for later review.")
+            self.board.input_allowed = False
         else:
-            self.prompt.setText("Correct so far. Continue the idea after the engine reply.")
+            self.prompt.setText(result.feedback)
 
-    def _complete(self, move_uci: str) -> None:
-        self.item = self.repository.record_practice_attempt(self.item, move_uci, True)
-        self.prompt.setText("Correct. This position has been scheduled for later review.")
-        self.board.input_allowed = False
+    def _restore_after_mistake(self) -> None:
+        self.game = self.session.game
+        self.board.game = self.game
+        self.board.set_review_moves(None, None)
+        self.board.set_classification("")
+        self.board.input_allowed = True
+        self.board.clear_selection()
 
     def _hint(self) -> None:
         self.hint_level = min(self.hint_level + 1, 3)
         board = chess.Board(self.item.fen)
-        first = chess.Move.from_uci(self.item.solution[0])
+        remaining = self.session.remaining_solution
+        first = chess.Move.from_uci(remaining[0])
         hints = (
             f"Theme: {self.item.theme.replace('_', ' ')}.",
             f"Candidate move: {board.san(first)}.",
-            f"Engine line: {san_variation(board.fen(), self.item.solution)}",
+            f"Engine line: {san_variation(board.fen(), remaining)}",
         )
         self.prompt.setText(hints[self.hint_level - 1])
 

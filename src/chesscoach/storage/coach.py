@@ -578,6 +578,9 @@ class CoachRepository:
                     **data,
                     "solution": tuple(data["solution"]),
                     "alternatives": tuple(data["alternatives"]),
+                    "alternative_lines": tuple(
+                        tuple(line) for line in data.get("alternative_lines", ())
+                    ),
                 }
             )
             for data in (json.loads(row[0]) for row in rows)

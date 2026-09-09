@@ -249,6 +249,31 @@ def test_practice_plays_reply_and_continues_line(app: QApplication, tmp_path: Pa
     assert dialog.prompt.text().startswith("Correct")
 
 
+def test_practice_mistake_returns_to_current_decision(app: QApplication, tmp_path: Path) -> None:
+    repository = CoachRepository(tmp_path / "games.sqlite3")
+    item = replace(bundle().practice[0], solution=("e2e4", "e7e5", "g1f3"))
+    repository.save_learning((), (item,), ())
+    dialog = PracticeDialog(item, repository)
+    dialog.board.select_square(chess.E2)
+    dialog.board.select_square(chess.E4)
+    dialog.board.select_square(chess.G1)
+    dialog.board.select_square(chess.H3)
+
+    assert dialog.prompt.text().startswith("Mistake")
+    assert dialog.session.solution_index == 2
+    assert dialog.board.game.position.move_stack[-1].uci() == "g1h3"
+
+    dialog.mistake_timer.stop()
+    dialog._restore_after_mistake()
+    expected_fen = chess.Board("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2").fen()
+    assert dialog.board.game.fen == expected_fen
+    dialog.board.select_square(chess.G1)
+    dialog.board.select_square(chess.F3)
+    assert dialog.prompt.text().startswith("Correct")
+    assert repository.practice_progress().successful == 1
+    dialog.close()
+
+
 def test_learning_dashboards_and_lesson_resume(
     app: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -187,10 +187,17 @@ class PracticeItem:
     due_at: str = ""
     interval_days: int = 1
     ease: float = 2.0
+    alternative_lines: tuple[tuple[str, ...], ...] = ()
 
     def validate_attempt(self, move: chess.Move) -> bool:
         board = chess.Board(self.fen)
-        return move in board.legal_moves and move.uci() in (self.solution[:1] + self.alternatives)
+        return move in board.legal_moves and move.uci() in self.accepted_moves(0)
+
+    def accepted_moves(self, index: int) -> tuple[str, ...]:
+        alternatives = self.alternative_lines[index] if index < len(self.alternative_lines) else ()
+        if index == 0:
+            alternatives += self.alternatives
+        return (self.solution[index],) + alternatives if index < len(self.solution) else ()
 
 
 @dataclass(frozen=True)
