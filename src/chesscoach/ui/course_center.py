@@ -14,9 +14,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chesscoach.chess.game import Game
 from chesscoach.coach.models import PracticeItem
 from chesscoach.coach.training import TrainingSession
-from chesscoach.chess.game import Game
 from chesscoach.courses.catalog import CourseCatalog
 from chesscoach.courses.models import Course
 from chesscoach.storage.coach import CoachRepository
@@ -111,7 +111,8 @@ class CourseDetailDialog(QDialog):
         layout.addWidget(
             QLabel(
                 f"<b>{course.title}</b><br>{course.description}<br>"
-                f"Estimated time: {course.estimated_minutes} minutes"
+                f"Estimated time: {course.estimated_minutes} minutes<br>"
+                f"{course.attribution}"
             )
         )
         self.modules = QListWidget()

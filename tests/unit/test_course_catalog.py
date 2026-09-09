@@ -61,3 +61,16 @@ def test_catalog_rejects_illegal_move():
 def test_catalog_rejects_more_than_two_learner_decisions():
     with pytest.raises(CourseCatalogError, match="exceeds two"):
         CourseCatalog.from_data(payload(("e2e4", "e7e5", "g1f3", "b8c6", "f1c4")))
+
+
+def test_built_in_starter_courses_are_complete():
+    catalog = CourseCatalog.built_in()
+    assert {course.id for course in catalog.courses} == {
+        "italian-game-white",
+        "caro-kann-black",
+        "queen-gambit-declined-black",
+    }
+    assert all(len(course.modules) == 4 for course in catalog.courses)
+    assert all(len(course.exercises) == 8 and course.attribution for course in catalog.courses)
+    assert catalog.courses[0].exercises[0].fen.split()[1] == "w"
+    assert all(course.exercises[0].fen.split()[1] == "b" for course in catalog.courses[1:])
