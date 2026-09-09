@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import time
 from collections.abc import Iterator
 from contextlib import closing
 from pathlib import Path
@@ -7,6 +8,8 @@ from pathlib import Path
 import chess
 import chess.engine
 import pytest
+from PySide6.QtCore import QSettings
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog
 
 from chesscoach.chess.pgn import parse_pgn
@@ -39,7 +42,13 @@ class FakeRunner(EngineRunner):
 @pytest.fixture
 def bot(app: QApplication, tmp_path: Path) -> Iterator[tuple[MainWindow, FakeRunner]]:
     runner = FakeRunner()
-    window = MainWindow(database=GameDatabase(tmp_path / "matches.sqlite3"), runner=runner)
+    preferences = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
+    preferences.setValue("play/bot_move_delay_ms", 0)
+    window = MainWindow(
+        database=GameDatabase(tmp_path / "matches.sqlite3"),
+        runner=runner,
+        preference_settings=preferences,
+    )
     window.setup.engine_path.setText("test-stockfish")
     window.show()
     yield window, runner
@@ -94,6 +103,54 @@ def test_black_gets_engine_opening(bot: tuple[MainWindow, FakeRunner]) -> None:
     assert not window.undo_button.isEnabled()
     human_move(window, "e7", "e5")
     assert len(window.game.history()) == 2
+
+
+def test_bot_reply_waits_for_configured_delay(app: QApplication, tmp_path: Path) -> None:
+    runner = FakeRunner()
+    preferences = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
+    preferences.setValue("play/bot_move_delay_ms", 300)
+    window = MainWindow(
+        database=GameDatabase(tmp_path / "match.sqlite3"),
+        runner=runner,
+        preference_settings=preferences,
+    )
+    window.setup.engine_path.setText("test-stockfish")
+    window.show()
+    window.start_match()
+    human_move(window, "e2", "e4")
+    runner.respond("e7e5")
+    started = time.monotonic()
+    assert len(window.game.history()) == 1
+    QTest.qWait(150)
+    app.processEvents()
+    assert len(window.game.history()) == 1
+    while len(window.game.history()) < 2 and time.monotonic() - started < 1.0:
+        app.processEvents()
+        QTest.qWait(20)
+    assert len(window.game.history()) == 2
+    assert time.monotonic() - started >= 0.25
+    window.close()
+
+
+def test_pending_bot_reply_is_cancelled_by_new_game(app: QApplication, tmp_path: Path) -> None:
+    runner = FakeRunner()
+    preferences = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
+    preferences.setValue("play/bot_move_delay_ms", 300)
+    window = MainWindow(
+        database=GameDatabase(tmp_path / "match.sqlite3"),
+        runner=runner,
+        preference_settings=preferences,
+    )
+    window.setup.engine_path.setText("test-stockfish")
+    window.start_match()
+    human_move(window, "e2", "e4")
+    runner.respond("e7e5")
+    assert window.pending_bot_result is not None
+    window.new_game()
+    QTest.qWait(400)
+    assert window.game.fen == chess.STARTING_FEN
+    assert window.pending_bot_result is None
+    window.close()
 
 
 def test_late_result_after_new_game_rejected(bot: tuple[MainWindow, FakeRunner]) -> None:
