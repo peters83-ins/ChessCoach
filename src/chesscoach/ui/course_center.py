@@ -99,6 +99,11 @@ class CourseLibraryDialog(QDialog):
         )
         CourseDetailDialog(course, self.repository, self).exec()
 
+    def open_course(self, course_id: str) -> None:
+        course = next((value for value in self.catalog.courses if value.id == course_id), None)
+        if course is not None:
+            CourseDetailDialog(course, self.repository, self).exec()
+
 
 class CourseDetailDialog(QDialog):
     def __init__(
@@ -137,17 +142,32 @@ class CourseDetailDialog(QDialog):
 
     def start_course(self) -> None:
         self.repository.enroll_course(self.course)
-        CoursePlayerDialog(self.course, self.repository, self).exec()
+        progress = self.repository.course_progress(self.course.id)
+        module_id = progress[0].last_module_id if progress else ""
+        start_index = next(
+            (
+                index
+                for index, exercise in enumerate(self.course.exercises)
+                if exercise.module_id == module_id
+            ),
+            0,
+        )
+        CoursePlayerDialog(self.course, self.repository, self, start_index=start_index).exec()
         self.update_progress()
 
 
 class CoursePlayerDialog(QDialog):
     def __init__(
-        self, course: Course, repository: CoachRepository, parent: QWidget | None = None
+        self,
+        course: Course,
+        repository: CoachRepository,
+        parent: QWidget | None = None,
+        *,
+        start_index: int = 0,
     ) -> None:
         super().__init__(parent)
         self.course, self.repository = course, repository
-        self.exercise_index = 0
+        self.exercise_index = max(0, min(start_index, len(course.exercises) - 1))
         self.hints_used = 0
         self.setWindowTitle(f"Learn: {course.title}")
         self.resize(760, 620)
