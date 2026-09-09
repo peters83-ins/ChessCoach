@@ -27,8 +27,10 @@ active development queue.
 - Compare recent and previous periods with greater weight on recent games.
 - Measure transfer: opening departure, repeated tactical errors, delayed practice
   success, and phase-accuracy changes after related lessons.
-- Link every insight to supporting games/exercises/course decisions and recommend one
-  ranked next action. Label metrics as project-specific Chess Coach estimates.
+- Link theme insights to supporting game positions through the review action; extend
+  links to exercises and course decisions as those views gain evidence records.
+  Recommend one ranked next action and label metrics as project-specific Chess Coach
+  estimates.
 - Add unit tests for aggregation, sample thresholds, recency weighting, transfer
   metrics, and recommendation ranking, plus a local insights panel.
 
