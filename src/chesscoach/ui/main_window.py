@@ -31,6 +31,7 @@ from chesscoach.coach.pipeline import CoachPipeline
 from chesscoach.coach.scoring import pov_score
 from chesscoach.coach.worker import CoachRunner
 from chesscoach.config import Settings
+from chesscoach.courses.catalog import CourseCatalog
 from chesscoach.engine.analysis import PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
 from chesscoach.preferences import UserPreferences
@@ -39,6 +40,7 @@ from chesscoach.storage.database import GameData, GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
 from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog
+from chesscoach.ui.course_center import CourseLibraryDialog
 from chesscoach.ui.diagnostics import DiagnosticInfo, DiagnosticsDialog
 from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.first_run import FirstRunWizard
@@ -59,6 +61,7 @@ class MainWindow(QMainWindow):
         runner: EngineRunner | None = None,
         coach_runner: CoachRunner | None = None,
         preference_settings: QSettings | None = None,
+        course_catalog: CourseCatalog | None = None,
     ) -> None:
         super().__init__()
         self.game = game if game is not None else Game()
@@ -108,6 +111,7 @@ class MainWindow(QMainWindow):
         self.coach_settings = Settings.from_environment(Path(".env"))
         self.preference_settings = preference_settings or QSettings()
         self.preferences = UserPreferences.load(self.preference_settings)
+        self.course_catalog = course_catalog or CourseCatalog.built_in()
         self.first_run_wizard: FirstRunWizard | None = None
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
@@ -120,12 +124,14 @@ class MainWindow(QMainWindow):
         self.review_action = QAction("Review", self)
         self.practice_action = QAction("Practice", self)
         self.lessons_action = QAction("Lessons", self)
+        self.courses_action = QAction("Courses", self)
         self.settings_action = QAction("Settings", self)
         self.play_action.setShortcut(QKeySequence.StandardKey.New)
         self.games_action.setShortcut(QKeySequence.StandardKey.Open)
         self.review_action.setShortcut(QKeySequence("Ctrl+R"))
         self.practice_action.setShortcut(QKeySequence("Ctrl+P"))
         self.lessons_action.setShortcut(QKeySequence("Ctrl+L"))
+        self.courses_action.setShortcut(QKeySequence("Ctrl+Shift+L"))
         self.settings_action.setShortcut(QKeySequence.StandardKey.Preferences)
         for action in (
             self.play_action,
@@ -133,6 +139,7 @@ class MainWindow(QMainWindow):
             self.review_action,
             self.practice_action,
             self.lessons_action,
+            self.courses_action,
             self.settings_action,
         ):
             navigation.addAction(action)
@@ -245,6 +252,7 @@ class MainWindow(QMainWindow):
         self.review_action.triggered.connect(self.open_review_destination)
         self.practice_action.triggered.connect(self.open_practice)
         self.lessons_action.triggered.connect(self.open_lessons)
+        self.courses_action.triggered.connect(self.open_courses)
         self.settings_action.triggered.connect(self.open_settings)
         self.apply_preferences(self.preferences)
         self.refresh()
@@ -965,6 +973,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("No lessons yet. Analyze a game to create them.")
             return
         LessonsDialog(lessons, self.coach_repository, self).exec()
+
+    def open_courses(self) -> None:
+        CourseLibraryDialog(self.course_catalog, self.coach_repository, self).exec()
 
     def open_weaknesses(self) -> None:
         dialog = WeaknessDashboardDialog(self.coach_repository, self)
