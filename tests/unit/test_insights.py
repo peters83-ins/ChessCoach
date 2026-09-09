@@ -2,12 +2,15 @@ from datetime import UTC, datetime, timedelta
 
 from chesscoach.chess.openings import OpeningMatch
 from chesscoach.coach.insights import (
+    analyzed_theme_counts,
     opening_stats,
+    phase_accuracy,
     recency_weighted_average,
     recommend_next_action,
     theme_frequency,
     transfer_metric,
 )
+from chesscoach.coach.models import EngineScore, GamePhase, MoveAnalysis, MoveClassification
 
 
 def test_opening_stats_require_five_games():
@@ -34,3 +37,27 @@ def test_theme_frequency_and_transfer_threshold():
     assert transfer_metric("fork", (True,) * 4, (True,) * 5) is None
     metric = transfer_metric("fork", (False,) * 5, (True,) * 5)
     assert metric is not None and metric.delta == 1.0
+
+
+def test_phase_and_analyzed_theme_aggregations():
+    move = MoveAnalysis(
+        1,
+        "fen",
+        "white",
+        "e2e4",
+        "e4",
+        "e2e4",
+        "e4",
+        EngineScore(10),
+        EngineScore(10),
+        0,
+        90,
+        MoveClassification.BEST,
+        GamePhase.OPENING,
+        (),
+        (),
+        10,
+        tags=("development",),
+    )
+    assert phase_accuracy((move,), "white") == (("opening", 90, 1),)
+    assert analyzed_theme_counts((move,)) == (("development", 1),)

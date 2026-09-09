@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from chesscoach.chess.openings import OpeningMatch, OpeningStatistic, aggregate_openings
+from chesscoach.coach.models import MoveAnalysis
 
 
 @dataclass(frozen=True)
@@ -77,3 +78,20 @@ def transfer_metric(
     return TransferMetric(
         theme, sum(before) / len(before), sum(after) / len(after), len(before) + len(after)
     )
+
+
+def phase_accuracy(
+    moves: Iterable[MoveAnalysis], player_color: str | None = None
+) -> tuple[tuple[str, float, int], ...]:
+    grouped: dict[str, list[float]] = {}
+    for move in moves:
+        if player_color is not None and move.mover != player_color:
+            continue
+        grouped.setdefault(move.phase.value, []).append(move.accuracy)
+    return tuple(
+        (phase, sum(values) / len(values), len(values)) for phase, values in sorted(grouped.items())
+    )
+
+
+def analyzed_theme_counts(moves: Iterable[MoveAnalysis]) -> tuple[tuple[str, int], ...]:
+    return theme_frequency(tag for move in moves for tag in move.tags)
