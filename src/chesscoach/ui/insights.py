@@ -1,9 +1,11 @@
 """Local, inspectable learning insights panel."""
 
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QLabel,
     QProgressBar,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -24,6 +26,8 @@ from chesscoach.storage.database import GameDatabase
 
 
 class InsightsDialog(QDialog):
+    example_requested = Signal(str, int)
+
     def __init__(
         self,
         repository: CoachRepository,
@@ -53,7 +57,13 @@ class InsightsDialog(QDialog):
         self.themes = QTableWidget(0, 2)
         self.themes.setHorizontalHeaderLabels(("Theme", "Occurrences"))
         self.themes.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.themes.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.themes.itemSelectionChanged.connect(self._update_example_button)
         layout.addWidget(self.themes)
+        self.open_example = QPushButton("Open supporting position")
+        self.open_example.setEnabled(False)
+        self.open_example.clicked.connect(self._open_example)
+        layout.addWidget(self.open_example)
         layout.addWidget(QLabel("Accuracy by game phase (analyzed player moves)"))
         self.phases = QTableWidget(0, 3)
         self.phases.setHorizontalHeaderLabels(("Phase", "Accuracy", "Moves"))
@@ -62,6 +72,7 @@ class InsightsDialog(QDialog):
         self.transfer = QLabel()
         self.transfer.setWordWrap(True)
         layout.addWidget(self.transfer)
+        self._theme_examples: dict[str, tuple[tuple[str, int], ...]] = {}
         self.refresh()
 
     def refresh(self) -> None:
@@ -78,17 +89,21 @@ class InsightsDialog(QDialog):
                 (stat.opening, str(stat.games), str(stat.wins), str(stat.losses))
             ):
                 self.openings.setItem(row, column, QTableWidgetItem(value))
+        details = self.repository.weakness_details()
+        self._theme_examples = {detail.theme: detail.examples for detail in details}
         analyzed = self.repository.stored_move_analyses()
         frequencies = analyzed_theme_counts(analyzed)
         if not frequencies:
             frequencies = theme_frequency(
                 detail.theme
-                for detail in self.repository.weakness_details()
+                for detail in details
                 for _ in range(detail.occurrences)
             )
         self.themes.setRowCount(len(frequencies))
         for row, (theme_name, count) in enumerate(frequencies):
-            self.themes.setItem(row, 0, QTableWidgetItem(theme_name.replace("_", " ").title()))
+            item = QTableWidgetItem(theme_name.replace("_", " ").title())
+            item.setData(Qt.ItemDataRole.UserRole, theme_name)
+            self.themes.setItem(row, 0, item)
             self.themes.setItem(row, 1, QTableWidgetItem(str(count)))
         phases = phase_accuracy(analyzed, "white")
         self.phases.setRowCount(len(phases))
@@ -96,8 +111,7 @@ class InsightsDialog(QDialog):
             for column, value in enumerate((phase.title(), f"{accuracy:.1f}%", str(count))):
                 self.phases.setItem(row, column, QTableWidgetItem(value))
         due = len(self.repository.due_course_mastery()) + self.repository.practice_progress().due
-        weaknesses = self.repository.weakness_details()
-        theme = weaknesses[0].theme if weaknesses else ""
+        theme = details[0].theme if details else ""
         self.mastery.setValue(self._mastery_percent())
         self.transfer.setText(
             "Transfer comparisons will appear after five qualifying before-and-after "
@@ -107,6 +121,27 @@ class InsightsDialog(QDialog):
             f"{len(games)} saved game(s). {recommend_next_action(due, theme, len(games))} "
             "All metrics are local Chess Coach estimates."
         )
+
+    def _update_example_button(self) -> None:
+        theme = self._selected_theme()
+        self.open_example.setEnabled(bool(theme and self._theme_examples.get(theme, ())))
+
+    def _open_example(self) -> None:
+        theme = self._selected_theme()
+        examples = self._theme_examples.get(theme, ()) if theme else ()
+        if examples:
+            game_id, ply = examples[0]
+            self.example_requested.emit(game_id, ply)
+
+    def _selected_theme(self) -> str | None:
+        rows = self.themes.selectionModel().selectedRows()
+        if not rows:
+            return None
+        item = self.themes.item(rows[0].row(), 0)
+        if item is None:
+            return None
+        value = item.data(Qt.ItemDataRole.UserRole)
+        return str(value) if value is not None else None
 
     def _mastery_percent(self) -> int:
         mastery = [
