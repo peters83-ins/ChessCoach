@@ -410,6 +410,23 @@ class CoachRepository:
             ).fetchone()
         return str(row[0]) if row else "white"
 
+    def stored_move_analyses(self, game_id: str | None = None) -> tuple[MoveAnalysis, ...]:
+        """Return persisted move analyses for local charts without rerunning Stockfish."""
+        if not self.path.is_file():
+            return ()
+        self.migrate()
+        query = (
+            "SELECT ma.data_json FROM move_analyses ma JOIN analysis_runs ar ON ar.id=ma.run_id "
+            "WHERE ar.state='complete'"
+        )
+        params: tuple[object, ...] = ()
+        if game_id is not None:
+            query += " AND ar.game_id=?"
+            params = (game_id,)
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(query, params).fetchall()
+        return tuple(_move_from_dict(json.loads(row[0])) for row in rows)
+
     def get_move_analysis(self, key: str) -> MoveAnalysis | None:
         if not self.path.is_file():
             return None

@@ -11,7 +11,13 @@ from PySide6.QtWidgets import (
 )
 
 from chesscoach.chess.openings import OpeningMatch
-from chesscoach.coach.insights import opening_stats, recommend_next_action, theme_frequency
+from chesscoach.coach.insights import (
+    analyzed_theme_counts,
+    opening_stats,
+    phase_accuracy,
+    recommend_next_action,
+    theme_frequency,
+)
 from chesscoach.courses.catalog import CourseCatalog
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameDatabase
@@ -48,6 +54,11 @@ class InsightsDialog(QDialog):
         self.themes.setHorizontalHeaderLabels(("Theme", "Occurrences"))
         self.themes.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.themes)
+        layout.addWidget(QLabel("Accuracy by game phase (analyzed player moves)"))
+        self.phases = QTableWidget(0, 3)
+        self.phases.setHorizontalHeaderLabels(("Phase", "Accuracy", "Moves"))
+        self.phases.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.phases)
         self.transfer = QLabel()
         self.transfer.setWordWrap(True)
         layout.addWidget(self.transfer)
@@ -67,15 +78,23 @@ class InsightsDialog(QDialog):
                 (stat.opening, str(stat.games), str(stat.wins), str(stat.losses))
             ):
                 self.openings.setItem(row, column, QTableWidgetItem(value))
-        frequencies = theme_frequency(
-            detail.theme
-            for detail in self.repository.weakness_details()
-            for _ in range(detail.occurrences)
-        )
+        analyzed = self.repository.stored_move_analyses()
+        frequencies = analyzed_theme_counts(analyzed)
+        if not frequencies:
+            frequencies = theme_frequency(
+                detail.theme
+                for detail in self.repository.weakness_details()
+                for _ in range(detail.occurrences)
+            )
         self.themes.setRowCount(len(frequencies))
         for row, (theme_name, count) in enumerate(frequencies):
             self.themes.setItem(row, 0, QTableWidgetItem(theme_name.replace("_", " ").title()))
             self.themes.setItem(row, 1, QTableWidgetItem(str(count)))
+        phases = phase_accuracy(analyzed, "white")
+        self.phases.setRowCount(len(phases))
+        for row, (phase, accuracy, count) in enumerate(phases):
+            for column, value in enumerate((phase.title(), f"{accuracy:.1f}%", str(count))):
+                self.phases.setItem(row, column, QTableWidgetItem(value))
         due = len(self.repository.due_course_mastery()) + self.repository.practice_progress().due
         weaknesses = self.repository.weakness_details()
         theme = weaknesses[0].theme if weaknesses else ""
