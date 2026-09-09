@@ -135,7 +135,7 @@ def test_version_one_feedback_schema_migrates_without_data_loss(tmp_path: Path) 
         ).fetchone()[0]
     assert "model" in columns and "context_hash" in columns
     assert row == ("game", "", "")
-    assert version == 3
+    assert version == 4
 
 
 def test_latest_run_status_supports_resume(tmp_path: Path) -> None:

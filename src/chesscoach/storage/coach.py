@@ -4,7 +4,7 @@ import json
 import sqlite3
 from contextlib import closing
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -26,8 +26,9 @@ from chesscoach.coach.models import (
     WeaknessScore,
 )
 from chesscoach.coach.practice import schedule_attempt
+from chesscoach.courses.models import Course, MoveMastery
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 DEFAULT_PROFILE_ID = "default"
 
 
@@ -43,6 +44,16 @@ class AnalysisRunStatus:
 class GameLearningStatus:
     analyzed: bool
     practice_count: int
+
+
+@dataclass(frozen=True)
+class CourseProgress:
+    profile_id: str
+    course_id: str
+    content_version: int
+    last_module_id: str
+    completed: bool
+    updated_at: str
 
 
 def _now() -> str:
@@ -110,6 +121,8 @@ class CoachRepository:
                 self._migration_two(connection)
             if version < 3:
                 self._migration_three(connection)
+            if version < 4:
+                self._migration_four(connection)
             if version < SCHEMA_VERSION:
                 connection.execute(
                     "INSERT INTO schema_versions VALUES ('coach', ?) "
@@ -206,6 +219,32 @@ class CoachRepository:
             "CREATE TABLE IF NOT EXISTS dismissed_weaknesses ("
             "profile_id TEXT NOT NULL, theme TEXT NOT NULL, dismissed_at TEXT NOT NULL, "
             "PRIMARY KEY(profile_id, theme))"
+        )
+
+    @staticmethod
+    def _migration_four(connection: sqlite3.Connection) -> None:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS course_progress ("
+            "profile_id TEXT NOT NULL, course_id TEXT NOT NULL, content_version INTEGER NOT NULL, "
+            "last_module_id TEXT NOT NULL, completed INTEGER NOT NULL DEFAULT 0, "
+            "enrolled_at TEXT NOT NULL, updated_at TEXT NOT NULL, "
+            "PRIMARY KEY(profile_id, course_id))"
+        )
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS course_mastery ("
+            "profile_id TEXT NOT NULL, course_id TEXT NOT NULL, exercise_id TEXT NOT NULL, "
+            "decision_index INTEGER NOT NULL, level INTEGER NOT NULL DEFAULT 0, "
+            "due_at TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, "
+            "errors INTEGER NOT NULL DEFAULT 0, hints INTEGER NOT NULL DEFAULT 0, "
+            "last_result TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, "
+            "PRIMARY KEY(profile_id, course_id, exercise_id, decision_index))"
+        )
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS course_attempts ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, profile_id TEXT NOT NULL, "
+            "course_id TEXT NOT NULL, exercise_id TEXT NOT NULL, decision_index INTEGER NOT NULL, "
+            "attempted_at TEXT NOT NULL, "
+            "move_uci TEXT NOT NULL, correct INTEGER NOT NULL, hints INTEGER NOT NULL DEFAULT 0)"
         )
 
     def start_run(self, game_id: str, profile: AnalysisProfile) -> str:
@@ -673,3 +712,132 @@ class CoachRepository:
                 "completed=excluded.completed, updated_at=excluded.updated_at, step=excluded.step",
                 (lesson_id, completed, _now(), step),
             )
+
+    def enroll_course(self, course: Course, profile_id: str = DEFAULT_PROFILE_ID) -> None:
+        """Create or update enrolment while preserving per-decision mastery."""
+        self.migrate()
+        first_module = course.modules[0].id if course.modules else ""
+        now = _now()
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute(
+                "INSERT INTO course_progress(profile_id, course_id, content_version, "
+                "last_module_id, "
+                "completed, enrolled_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?) "
+                "ON CONFLICT(profile_id, course_id) DO UPDATE SET "
+                "content_version=excluded.content_version, "
+                "updated_at=excluded.updated_at",
+                (profile_id, course.id, course.version, first_module, now, now),
+            )
+
+    def course_progress(
+        self, course_id: str | None = None, profile_id: str = DEFAULT_PROFILE_ID
+    ) -> tuple[CourseProgress, ...]:
+        self.migrate()
+        query = (
+            "SELECT profile_id, course_id, content_version, last_module_id, completed, updated_at "
+            "FROM course_progress WHERE profile_id=?"
+        )
+        params: tuple[object, ...] = (profile_id,)
+        if course_id is not None:
+            query += " AND course_id=?"
+            params += (course_id,)
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(query, params).fetchall()
+        return tuple(
+            CourseProgress(
+                str(row[0]), str(row[1]), int(row[2]), str(row[3]), bool(row[4]), str(row[5])
+            )
+            for row in rows
+        )
+
+    def set_course_module(
+        self,
+        course_id: str,
+        module_id: str,
+        *,
+        completed: bool = False,
+        profile_id: str = DEFAULT_PROFILE_ID,
+    ) -> None:
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute(
+                "UPDATE course_progress SET last_module_id=?, completed=?, updated_at=? "
+                "WHERE profile_id=? AND course_id=?",
+                (module_id, completed, _now(), profile_id, course_id),
+            )
+
+    def course_mastery(
+        self, course_id: str, profile_id: str = DEFAULT_PROFILE_ID
+    ) -> tuple[MoveMastery, ...]:
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(
+                "SELECT profile_id, course_id, exercise_id, decision_index, level, due_at, "
+                "attempts, "
+                "errors, hints, last_result FROM course_mastery WHERE profile_id=? AND course_id=? "
+                "ORDER BY exercise_id, decision_index",
+                (profile_id, course_id),
+            ).fetchall()
+        return tuple(MoveMastery(*row) for row in rows)
+
+    def record_course_attempt(
+        self,
+        course_id: str,
+        exercise_id: str,
+        decision_index: int,
+        move_uci: str,
+        correct: bool,
+        hints: int = 0,
+        profile_id: str = DEFAULT_PROFILE_ID,
+    ) -> MoveMastery:
+        """Record one decision; a mistake affects only that decision's mastery."""
+        self.migrate()
+        now = datetime.now(UTC)
+        due = now + timedelta(days=1 if correct else 0)
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute(
+                "INSERT INTO course_attempts(profile_id, course_id, exercise_id, decision_index, "
+                "attempted_at, move_uci, correct, hints) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    profile_id,
+                    course_id,
+                    exercise_id,
+                    decision_index,
+                    now.isoformat(),
+                    move_uci,
+                    correct,
+                    hints,
+                ),
+            )
+            connection.execute(
+                "INSERT INTO course_mastery(profile_id, course_id, exercise_id, "
+                "decision_index, level, "
+                "due_at, attempts, errors, hints, last_result, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?) "
+                "ON CONFLICT(profile_id, course_id, exercise_id, decision_index) DO UPDATE SET "
+                "level=MAX(0, course_mastery.level + excluded.level), due_at=excluded.due_at, "
+                "attempts=course_mastery.attempts+1, errors=course_mastery.errors+excluded.errors, "
+                "hints=course_mastery.hints+excluded.hints, "
+                "last_result=excluded.last_result, updated_at=excluded.updated_at",
+                (
+                    profile_id,
+                    course_id,
+                    exercise_id,
+                    decision_index,
+                    1 if correct else 0,
+                    due.isoformat(),
+                    0 if correct else 1,
+                    hints,
+                    "correct" if correct else "mistake",
+                    now.isoformat(),
+                ),
+            )
+            row = connection.execute(
+                "SELECT profile_id, course_id, exercise_id, decision_index, level, due_at, "
+                "attempts, "
+                "errors, hints, last_result FROM course_mastery WHERE profile_id=? AND course_id=? "
+                "AND exercise_id=? AND decision_index=?",
+                (profile_id, course_id, exercise_id, decision_index),
+            ).fetchone()
+        assert row is not None
+        return MoveMastery(*row)
