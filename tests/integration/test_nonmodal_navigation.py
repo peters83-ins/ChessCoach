@@ -18,8 +18,12 @@ def test_navigation_destinations_can_stay_open_and_switch(
     window = MainWindow(database=GameDatabase(tmp_path / "games.sqlite3"), runner=IdleEngine())
     window.open_courses()
     first = window.destination_dialogs["courses"]
+    assert window.workspace_stack.currentWidget() is first
     window.open_courses()
     assert window.destination_dialogs["courses"] is first
     window.open_learning_home()
     assert set(window.destination_dialogs) >= {"courses", "learn"}
+    assert window.workspace_stack.currentWidget() is window.destination_dialogs["learn"]
+    window.show_play_workspace()
+    assert window.workspace_stack.currentIndex() == 0
     window.close()
