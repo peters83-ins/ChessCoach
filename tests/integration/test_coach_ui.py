@@ -265,9 +265,7 @@ def test_practice_mistake_returns_to_current_decision(app: QApplication, tmp_pat
 
     dialog.mistake_timer.stop()
     dialog._restore_after_mistake()
-    expected_fen = chess.Board(
-        "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
-    ).fen()
+    expected_fen = chess.Board("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2").fen()
     assert dialog.board.game.fen == expected_fen
     dialog.board.select_square(chess.G1)
     dialog.board.select_square(chess.F3)
