@@ -970,7 +970,7 @@ class MainWindow(QMainWindow):
         self.set_review_index(ply)
 
     def open_practice(self) -> None:
-        PracticeQueueDialog(self.coach_repository, self).exec()
+        PracticeQueueDialog(self.coach_repository, self, self.course_catalog).exec()
 
     def open_lessons(self) -> None:
         lessons = self.coach_repository.lessons()
