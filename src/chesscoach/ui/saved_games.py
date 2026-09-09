@@ -67,6 +67,8 @@ class SavedGamesDialog(QDialog):
             row.addWidget(widget)
         filters.addRow("Filter and sort", row)
         layout.addLayout(filters)
+        self.filter_summary = QLabel()
+        layout.addWidget(self.filter_summary)
         self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
             ("Saved", "Player", "Bot", "Result", "Moves", "Opening", "Analysis", "Practice")
@@ -130,6 +132,7 @@ class SavedGamesDialog(QDialog):
                 ).casefold()
             )
         ]
+        self.filter_summary.setText(f"Showing {len(games)} of {len(self.games)} saved games")
         sort_key = self.sort_order.currentText()
         if sort_key == "Oldest":
             games.sort(key=lambda game: game.saved_at)
