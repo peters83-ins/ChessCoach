@@ -37,11 +37,12 @@ from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameData, GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.chess_board import ChessBoard
-from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog, PracticeDialog
+from chesscoach.ui.coach_panel import CoachPanel, LessonsDialog
 from chesscoach.ui.diagnostics import DiagnosticInfo, DiagnosticsDialog
 from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.game_review import GameReview
+from chesscoach.ui.learning_center import PracticeQueueDialog, WeaknessDashboardDialog
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import BADGES, MoveHistory
 from chesscoach.ui.saved_games import SavedGamesDialog
@@ -174,6 +175,7 @@ class MainWindow(QMainWindow):
         self.coach_panel.cancel_requested.connect(self.cancel_coach_analysis)
         self.coach_panel.practice_requested.connect(self.open_practice)
         self.coach_panel.lessons_requested.connect(self.open_lessons)
+        self.coach_panel.weaknesses_requested.connect(self.open_weaknesses)
         sidebar.addWidget(self.coach_panel)
         self.engine_label = QLabel("")
         self.engine_label.setWordWrap(True)
@@ -867,14 +869,31 @@ class MainWindow(QMainWindow):
         self.set_review_index(ply)
 
     def open_practice(self) -> None:
-        if self.coach_bundle is None or not self.coach_bundle.practice:
-            return
-        PracticeDialog(self.coach_bundle.practice[0], self.coach_repository, self).exec()
+        PracticeQueueDialog(self.coach_repository, self).exec()
 
     def open_lessons(self) -> None:
-        if self.coach_bundle is None or not self.coach_bundle.lessons:
+        lessons = self.coach_repository.lessons()
+        if not lessons:
+            self.statusBar().showMessage("No lessons yet. Analyze a game to create them.")
             return
-        LessonsDialog(self.coach_bundle.lessons, self.coach_repository, self).exec()
+        LessonsDialog(lessons, self.coach_repository, self).exec()
+
+    def open_weaknesses(self) -> None:
+        dialog = WeaknessDashboardDialog(self.coach_repository, self)
+        dialog.example_requested.connect(self.open_game_example)
+        dialog.exec()
+
+    def open_game_example(self, game_id: str, ply: int) -> None:
+        try:
+            data = self.database.load_game(game_id)
+        except (OSError, sqlite3.Error, ValueError) as error:
+            self.statusBar().showMessage(f"Open example failed: {error}")
+            return
+        if data is None:
+            self.statusBar().showMessage("The source game is no longer available.")
+            return
+        self.open_review(data)
+        self.set_review_index(min(ply, len(data.moves)))
 
     def new_game(self) -> None:
         if not self.save_match():

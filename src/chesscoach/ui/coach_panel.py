@@ -22,6 +22,7 @@ from chesscoach.chess.pgn import san_variation
 from chesscoach.coach.models import CoachBundle, Lesson, MoveClassification, PracticeItem
 from chesscoach.coach.scoring import player_accuracy
 from chesscoach.storage.coach import CoachRepository
+from chesscoach.storage.database import GameDatabase
 from chesscoach.ui.chess_board import ChessBoard
 
 
@@ -30,6 +31,7 @@ class CoachPanel(QWidget):
     cancel_requested = Signal()
     practice_requested = Signal()
     lessons_requested = Signal()
+    weaknesses_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -73,15 +75,18 @@ class CoachPanel(QWidget):
         learning = QHBoxLayout()
         self.practice_button = QPushButton("Practice")
         self.lessons_button = QPushButton("Lessons")
+        self.weaknesses_button = QPushButton("Weaknesses")
         self.practice_button.setEnabled(False)
         self.lessons_button.setEnabled(False)
         learning.addWidget(self.practice_button)
         learning.addWidget(self.lessons_button)
+        learning.addWidget(self.weaknesses_button)
         layout.addLayout(learning)
         self.analyze_button.clicked.connect(self.analyze_requested.emit)
         self.cancel_button.clicked.connect(self.cancel_requested.emit)
         self.practice_button.clicked.connect(self.practice_requested.emit)
         self.lessons_button.clicked.connect(self.lessons_requested.emit)
+        self.weaknesses_button.clicked.connect(self.weaknesses_requested.emit)
         self.filter.currentIndexChanged.connect(lambda: self.show_ply(self.current_ply))
 
     def set_ai_ready(self, ready: bool) -> None:
@@ -212,6 +217,7 @@ class PracticeDialog(QDialog):
         self.item = item
         self.repository = repository
         self.hint_level = 0
+        self.solution_index = 0
         self.setWindowTitle(f"Practice · {item.theme.replace('_', ' ').title()}")
         layout = QVBoxLayout(self)
         self.prompt = QLabel("Find the best move.")
@@ -224,26 +230,48 @@ class PracticeDialog(QDialog):
         layout.addWidget(self.board)
         controls = QHBoxLayout()
         self.hint_button = QPushButton("Hint")
+        self.reveal_button = QPushButton("Reveal Solution")
         close_button = QPushButton("Close")
         controls.addWidget(self.hint_button)
+        controls.addWidget(self.reveal_button)
         controls.addWidget(close_button)
         layout.addLayout(controls)
         self.hint_button.clicked.connect(self._hint)
+        self.reveal_button.clicked.connect(self._reveal)
         close_button.clicked.connect(self.reject)
         self.resize(620, 680)
 
     def _attempted(self) -> None:
         move = self.game.position.move_stack[-1]
-        successful = self.item.validate_attempt(move)
-        self.item = self.repository.record_practice_attempt(self.item, move.uci(), successful)
-        if successful:
-            self.prompt.setText("Correct. This position has been scheduled for later review.")
-            self.board.input_allowed = False
-        else:
+        expected = self.item.solution[self.solution_index]
+        alternative = self.solution_index == 0 and move.uci() in self.item.alternatives
+        if move.uci() != expected and not alternative:
+            self.item = self.repository.record_practice_attempt(self.item, move.uci(), False)
             self.prompt.setText("Try again. Check forcing moves before committing.")
             self.game = Game(self.item.fen)
             self.board.game = self.game
+            self.solution_index = 0
             self.board.clear_selection()
+            return
+        self.solution_index += 1
+        if alternative:
+            self._complete(move.uci())
+            return
+        if self.solution_index < len(self.item.solution):
+            reply = chess.Move.from_uci(self.item.solution[self.solution_index])
+            if reply in self.game.position.legal_moves:
+                self.game.attempt_move(reply)
+                self.solution_index += 1
+                self.board.clear_selection()
+        if self.solution_index >= len(self.item.solution):
+            self._complete(move.uci())
+        else:
+            self.prompt.setText("Correct so far. Continue the idea after the engine reply.")
+
+    def _complete(self, move_uci: str) -> None:
+        self.item = self.repository.record_practice_attempt(self.item, move_uci, True)
+        self.prompt.setText("Correct. This position has been scheduled for later review.")
+        self.board.input_allowed = False
 
     def _hint(self) -> None:
         self.hint_level = min(self.hint_level + 1, 3)
@@ -256,6 +284,10 @@ class PracticeDialog(QDialog):
         )
         self.prompt.setText(hints[self.hint_level - 1])
 
+    def _reveal(self) -> None:
+        self.prompt.setText(f"Solution: {san_variation(self.item.fen, self.item.solution)}")
+        self.board.input_allowed = False
+
 
 class LessonsDialog(QDialog):
     def __init__(
@@ -267,6 +299,8 @@ class LessonsDialog(QDialog):
         super().__init__(parent)
         self.lessons = lessons
         self.repository = repository
+        self.completed_ids = {lesson.id for lesson in lessons if lesson.completed}
+        self.step = 0
         self.setWindowTitle("Personalized Lessons")
         layout = QVBoxLayout(self)
         self.selector = QComboBox()
@@ -274,31 +308,98 @@ class LessonsDialog(QDialog):
             self.selector.addItem(lesson.title)
         self.content = QLabel()
         self.content.setWordWrap(True)
+        self.example_game = Game()
+        self.example_board = ChessBoard(self.example_game)
+        self.example_board.input_allowed = False
+        self.example_board.hide()
+        navigation = QHBoxLayout()
+        self.previous = QPushButton("Previous Step")
+        self.next = QPushButton("Next Step")
+        self.practice = QPushButton("Practice Concept")
         complete = QPushButton("Mark Complete")
         close = QPushButton("Close")
         layout.addWidget(self.selector)
         layout.addWidget(self.content)
+        layout.addWidget(self.example_board)
+        navigation.addWidget(self.previous)
+        navigation.addWidget(self.next)
+        navigation.addWidget(self.practice)
+        layout.addLayout(navigation)
         layout.addWidget(complete)
         layout.addWidget(close)
-        self.selector.currentIndexChanged.connect(self._show_lesson)
+        self.selector.currentIndexChanged.connect(self._load_lesson)
+        self.previous.clicked.connect(lambda: self._change_step(-1))
+        self.next.clicked.connect(lambda: self._change_step(1))
+        self.practice.clicked.connect(self._practice)
         complete.clicked.connect(self._complete)
         close.clicked.connect(self.accept)
-        self._show_lesson(0)
-        self.resize(500, 360)
+        self._load_lesson(0)
+        self.resize(680, 700)
 
-    def _show_lesson(self, index: int) -> None:
+    def _load_lesson(self, index: int) -> None:
+        if not 0 <= index < len(self.lessons):
+            return
+        self.step = min(4, self.repository.lesson_step(self.lessons[index].id))
+        self._show_step()
+
+    def _show_step(self) -> None:
+        index = self.selector.currentIndex()
         if not 0 <= index < len(self.lessons):
             return
         lesson = self.lessons[index]
         cues = "\n• ".join(lesson.recognition_cues)
-        self.content.setText(
-            f"{lesson.concept}\n\nRecognition cues:\n• {cues}\n\n"
-            f"Common error: {lesson.common_error}\n"
-            f"Example: move {lesson.example_ply} from game {lesson.example_game_id}"
+        steps = (
+            f"1 of 5 · Idea\n\n{lesson.concept}",
+            f"2 of 5 · Recognition cues\n\n• {cues}",
+            f"3 of 5 · Example\n\nMove {lesson.example_ply} from game "
+            f"{lesson.example_game_id[:8]}. Find the relevant pieces on the board.",
+            f"4 of 5 · Common error\n\n{lesson.common_error}\n\n"
+            "Use Practice Concept to solve the engine-verified source position.",
+            "5 of 5 · Recap\n\nName the cue you will check in your next game, then mark "
+            "the lesson complete. Later successful practice reduces this weakness score.",
         )
+        self.content.setText(steps[self.step])
+        self.example_board.setVisible(self.step == 2 and self._set_example_position(lesson))
+        self.previous.setEnabled(self.step > 0)
+        self.next.setEnabled(self.step < 4)
+        self.practice.setEnabled(bool(lesson.exercise_ids))
+
+    def _set_example_position(self, lesson: Lesson) -> bool:
+        data = GameDatabase(self.repository.path).load_game(lesson.example_game_id)
+        if data is None or lesson.example_ply < 1 or lesson.example_ply >= len(data.fens):
+            return False
+        self.example_game = Game(data.fens[lesson.example_ply - 1])
+        self.example_board.game = self.example_game
+        self.example_board.set_orientation(self.example_game.turn)
+        self.example_board.refresh()
+        return True
+
+    def _change_step(self, amount: int) -> None:
+        index = self.selector.currentIndex()
+        if not 0 <= index < len(self.lessons):
+            return
+        self.step = max(0, min(4, self.step + amount))
+        lesson = self.lessons[index]
+        self.repository.set_lesson_completed(
+            lesson.id, lesson.id in self.completed_ids, step=self.step
+        )
+        self._show_step()
+
+    def _practice(self) -> None:
+        index = self.selector.currentIndex()
+        if not 0 <= index < len(self.lessons):
+            return
+        lesson = self.lessons[index]
+        items = {item.id: item for item in self.repository.practice_items()}
+        item = next((items[item_id] for item_id in lesson.exercise_ids if item_id in items), None)
+        if item is not None:
+            PracticeDialog(item, self.repository, self).exec()
 
     def _complete(self) -> None:
         index = self.selector.currentIndex()
         if 0 <= index < len(self.lessons):
-            self.repository.set_lesson_completed(self.lessons[index].id)
-            self.content.setText(self.content.text() + "\n\nCompleted.")
+            self.completed_ids.add(self.lessons[index].id)
+            self.repository.set_lesson_completed(self.lessons[index].id, step=4)
+            self.content.setText(
+                self.content.text() + "\n\nCompleted. Continue with follow-up practice."
+            )

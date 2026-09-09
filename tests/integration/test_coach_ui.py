@@ -1,10 +1,11 @@
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import chess
 import pytest
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QApplication, QDialog
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from chesscoach.chess.pgn import parse_pgn
 from chesscoach.coach.models import (
@@ -24,6 +25,7 @@ from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameData, GameDatabase
 from chesscoach.storage.match import BotMatch
 from chesscoach.ui.coach_panel import LessonsDialog, PracticeDialog
+from chesscoach.ui.learning_center import PracticeQueueDialog, WeaknessDashboardDialog
 from chesscoach.ui.main_window import MainWindow
 from chesscoach.ui.saved_games import SavedGamesDialog
 
@@ -227,3 +229,55 @@ def test_interrupted_analysis_is_offered_for_resume(
     window.load_saved_game()
     assert window.coach_panel.analyze_button.text() == "Resume Analysis"
     assert "reuses every completed cached position" in window.coach_panel.feedback.text()
+
+
+def test_practice_plays_reply_and_continues_line(app: QApplication, tmp_path: Path) -> None:
+    repository = CoachRepository(tmp_path / "games.sqlite3")
+    item = replace(bundle().practice[0], solution=("e2e4", "e7e5", "g1f3"))
+    repository.save_learning((), (item,), ())
+    dialog = PracticeDialog(item, repository)
+    dialog.board.select_square(chess.E2)
+    dialog.board.select_square(chess.E4)
+    assert dialog.game.position.move_stack[-1].uci() == "e7e5"
+    assert "Continue" in dialog.prompt.text()
+    dialog.board.select_square(chess.G1)
+    dialog.board.select_square(chess.F3)
+    assert dialog.prompt.text().startswith("Correct")
+
+
+def test_learning_dashboards_and_lesson_resume(
+    app: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    game_data = data()
+    database = GameDatabase(tmp_path / "games.sqlite3")
+    assert database.save_game(game_data).success
+    repository = CoachRepository(database.path)
+    result = bundle()
+    repository.save_learning(
+        tuple(),
+        result.practice,
+        result.lessons,
+    )
+    analysis_run = repository.start_run(game_data.id, result.analysis.profile)
+    repository.save_analysis(analysis_run, result.analysis)
+    CoachPipeline(repository).build(game_data, result.analysis)
+
+    dashboard = WeaknessDashboardDialog(repository)
+    assert dashboard.table.rowCount() >= 1
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    dashboard.dismiss_button.click()
+    assert dashboard.table.rowCount() == 0
+
+    queue = PracticeQueueDialog(repository)
+    assert "Due today:" in queue.progress.text()
+    assert queue.table.rowCount() >= 1
+
+    lessons = repository.lessons()
+    dialog = LessonsDialog(lessons, repository)
+    dialog.next.click()
+    dialog.next.click()
+    assert dialog.step == 2
+    assert not dialog.example_board.isHidden()
+    dialog.close()
+    reopened = LessonsDialog(repository.lessons(), repository)
+    assert reopened.step == 2

@@ -40,9 +40,9 @@ def aggregate_weaknesses(
     events: Iterable[WeaknessEvent], *, now: datetime | None = None
 ) -> tuple[WeaknessScore, ...]:
     reference = now or datetime.now(UTC)
-    totals: dict[str, float] = defaultdict(float)
-    counts: dict[str, int] = defaultdict(int)
-    for event in events:
+    grouped: dict[tuple[str, str, str], float] = {}
+    theme_events: dict[str, int] = defaultdict(int)
+    for index, event in enumerate(events):
         direction = -0.5 if event.outcome == "mastered" else 1.0
         recency = 1.0
         if event.observed_at:
@@ -51,9 +51,17 @@ def aggregate_weaknesses(
                 observed = observed.replace(tzinfo=UTC)
             age_days = max(0.0, (reference - observed).total_seconds() / 86_400)
             recency = 0.5 ** (age_days / 90)
-        totals[event.theme] += direction * event.severity * event.confidence * recency
-        counts[event.theme] += 1
+        contribution = direction * event.severity * event.confidence * recency
+        source = event.game_id or f"event-{index}"
+        key = (event.theme, source, event.outcome)
+        current = grouped.get(key)
+        if current is None or abs(contribution) > abs(current):
+            grouped[key] = contribution
+    totals: dict[str, float] = defaultdict(float)
+    for (theme, _, _), contribution in grouped.items():
+        totals[theme] += contribution
+        theme_events[theme] += 1
     return tuple(
-        WeaknessScore(theme, round(max(0.0, score), 2), counts[theme])
+        WeaknessScore(theme, round(max(0.0, score), 2), theme_events[theme])
         for theme, score in sorted(totals.items(), key=lambda item: (-item[1], item[0]))
     )

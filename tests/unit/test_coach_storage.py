@@ -135,7 +135,7 @@ def test_version_one_feedback_schema_migrates_without_data_loss(tmp_path: Path) 
         ).fetchone()[0]
     assert "model" in columns and "context_hash" in columns
     assert row == ("game", "", "")
-    assert version == 2
+    assert version == 3
 
 
 def test_latest_run_status_supports_resume(tmp_path: Path) -> None:
@@ -145,3 +145,27 @@ def test_latest_run_status_supports_resume(tmp_path: Path) -> None:
     status = repository.latest_run_status("game")
     assert status is not None
     assert (status.state, status.completed, status.total) == ("cancelled", 3, 10)
+
+
+def test_weakness_dismissal_and_practice_progress(tmp_path: Path) -> None:
+    path = tmp_path / "games.sqlite3"
+    game = saved_game(path)
+    repository = CoachRepository(path)
+    analysis = GameAnalysisService(FakeEngine, repository).analyze(
+        game, "engine", AnalysisProfile(quick_time=0.01, deep_time=0.02)
+    )
+    bundle = CoachPipeline(repository).build(game, analysis)
+    details = repository.weakness_details()
+    assert details and details[0].examples[0] == (game.id, 1)
+    assert repository.practice_progress().due == len(bundle.practice)
+    repository.dismiss_weakness(details[0].theme)
+    assert details[0].theme not in {item.theme for item in repository.weakness_scores()}
+
+
+def test_lesson_step_is_persistent(tmp_path: Path) -> None:
+    repository = CoachRepository(tmp_path / "games.sqlite3")
+    repository.migrate()
+    repository.set_lesson_completed("lesson", False, step=3)
+    assert repository.lesson_step("lesson") == 3
+    repository.set_lesson_completed("lesson", True, step=4)
+    assert repository.lesson_step("lesson") == 4

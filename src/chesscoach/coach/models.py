@@ -114,8 +114,8 @@ class CoachingContext:
             "best": self.move.best_uci,
             "classification": self.move.classification.value,
             "loss_percent": round(self.move.loss_percent, 2),
-            "best_pv": self.move.best_pv,
-            "played_pv": self.move.played_pv,
+            "best_pv": self.move.best_pv[:8],
+            "played_pv": self.move.played_pv[:8],
             "evidence": [
                 {"id": fact.id, "tag": fact.tag, "summary": fact.summary}
                 for fact in self.move.evidence
@@ -164,6 +164,16 @@ class WeaknessScore:
 
 
 @dataclass(frozen=True)
+class WeaknessDetail:
+    theme: str
+    score: float
+    occurrences: int
+    confidence: float
+    trend: str
+    examples: tuple[tuple[str, int], ...]
+
+
+@dataclass(frozen=True)
 class PracticeItem:
     id: str
     profile_id: str
@@ -180,6 +190,14 @@ class PracticeItem:
     def validate_attempt(self, move: chess.Move) -> bool:
         board = chess.Board(self.fen)
         return move in board.legal_moves and move.uci() in (self.solution[:1] + self.alternatives)
+
+
+@dataclass(frozen=True)
+class PracticeProgress:
+    total: int
+    due: int
+    attempted: int
+    successful: int
 
 
 @dataclass(frozen=True)

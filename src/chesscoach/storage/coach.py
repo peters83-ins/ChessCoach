@@ -20,12 +20,14 @@ from chesscoach.coach.models import (
     MoveAnalysis,
     MoveClassification,
     PracticeItem,
+    PracticeProgress,
+    WeaknessDetail,
     WeaknessEvent,
     WeaknessScore,
 )
 from chesscoach.coach.practice import schedule_attempt
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 DEFAULT_PROFILE_ID = "default"
 
 
@@ -106,6 +108,8 @@ class CoachRepository:
             elif version < 2:
                 self._migration_one(connection)
                 self._migration_two(connection)
+            if version < 3:
+                self._migration_three(connection)
             if version < SCHEMA_VERSION:
                 connection.execute(
                     "INSERT INTO schema_versions VALUES ('coach', ?) "
@@ -188,6 +192,21 @@ class CoachRepository:
             "data_json, created_at FROM coach_feedback_v1"
         )
         connection.execute("DROP TABLE coach_feedback_v1")
+
+    @staticmethod
+    def _migration_three(connection: sqlite3.Connection) -> None:
+        lesson_columns = {
+            str(row[1]) for row in connection.execute("PRAGMA table_info(lesson_progress)")
+        }
+        if lesson_columns and "step" not in lesson_columns:
+            connection.execute(
+                "ALTER TABLE lesson_progress ADD COLUMN step INTEGER NOT NULL DEFAULT 0"
+            )
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS dismissed_weaknesses ("
+            "profile_id TEXT NOT NULL, theme TEXT NOT NULL, dismissed_at TEXT NOT NULL, "
+            "PRIMARY KEY(profile_id, theme))"
+        )
 
     def start_run(self, game_id: str, profile: AnalysisProfile) -> str:
         self.migrate()
@@ -469,17 +488,62 @@ class CoachRepository:
         self.migrate()
         with closing(sqlite3.connect(self.path)) as connection:
             rows = connection.execute(
-                "SELECT theme, severity, confidence, outcome, created_at FROM weakness_events "
-                "WHERE profile_id=?",
-                (profile_id,),
+                "SELECT game_id, ply, theme, severity, confidence, outcome, created_at "
+                "FROM weakness_events WHERE profile_id=? AND theme NOT IN "
+                "(SELECT theme FROM dismissed_weaknesses WHERE profile_id=?)",
+                (profile_id, profile_id),
             ).fetchall()
         from chesscoach.coach.weakness import aggregate_weaknesses
 
         events = tuple(
-            WeaknessEvent(profile_id, "", 0, theme, severity, confidence, outcome, created_at)
-            for theme, severity, confidence, outcome, created_at in rows
+            WeaknessEvent(
+                profile_id, game_id, ply, theme, severity, confidence, outcome, created_at
+            )
+            for game_id, ply, theme, severity, confidence, outcome, created_at in rows
         )
         return aggregate_weaknesses(events)
+
+    def weakness_details(self, profile_id: str = DEFAULT_PROFILE_ID) -> tuple[WeaknessDetail, ...]:
+        scores = {item.theme: item for item in self.weakness_scores(profile_id)}
+        if not scores:
+            return ()
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(
+                "SELECT game_id, ply, theme, confidence, created_at FROM weakness_events "
+                "WHERE profile_id=? AND outcome='observed' ORDER BY created_at DESC",
+                (profile_id,),
+            ).fetchall()
+        now = datetime.now(UTC)
+        grouped: dict[str, list[tuple[str, int, float, str]]] = {}
+        for game_id, ply, theme, confidence, created_at in rows:
+            if theme in scores:
+                grouped.setdefault(str(theme), []).append(
+                    (str(game_id), int(ply), float(confidence), str(created_at))
+                )
+        details = []
+        for theme, score in scores.items():
+            events = grouped.get(theme, [])
+            recent = sum(
+                1
+                for *_, created_at in events
+                if (now - datetime.fromisoformat(created_at)).days <= 45
+            )
+            earlier = len(events) - recent
+            trend = "new" if not earlier else "improving" if recent < earlier else "needs attention"
+            confidence = sum(event[2] for event in events) / len(events) if events else 0.0
+            examples = tuple((event[0], event[1]) for event in events[:3])
+            details.append(
+                WeaknessDetail(theme, score.score, score.occurrences, confidence, trend, examples)
+            )
+        return tuple(details)
+
+    def dismiss_weakness(self, theme: str, profile_id: str = DEFAULT_PROFILE_ID) -> None:
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO dismissed_weaknesses VALUES (?, ?, ?)",
+                (profile_id, theme, _now()),
+            )
 
     def practice_items(self, profile_id: str = DEFAULT_PROFILE_ID) -> tuple[PracticeItem, ...]:
         self.migrate()
@@ -498,6 +562,22 @@ class CoachRepository:
             )
             for data in (json.loads(row[0]) for row in rows)
         )
+
+    def practice_progress(self, profile_id: str = DEFAULT_PROFILE_ID) -> PracticeProgress:
+        self.migrate()
+        now = _now()
+        with closing(sqlite3.connect(self.path)) as connection:
+            total, due = connection.execute(
+                "SELECT COUNT(*), SUM(CASE WHEN due_at<=? THEN 1 ELSE 0 END) "
+                "FROM practice_items WHERE profile_id=?",
+                (now, profile_id),
+            ).fetchone()
+            attempted, successful = connection.execute(
+                "SELECT COUNT(*), COALESCE(SUM(successful), 0) FROM practice_attempts "
+                "WHERE item_id IN (SELECT id FROM practice_items WHERE profile_id=?)",
+                (profile_id,),
+            ).fetchone()
+        return PracticeProgress(int(total), int(due or 0), int(attempted), int(successful))
 
     def lessons(self, profile_id: str = DEFAULT_PROFILE_ID) -> tuple[Lesson, ...]:
         self.migrate()
@@ -551,11 +631,22 @@ class CoachRepository:
                 )
         return updated
 
-    def set_lesson_completed(self, lesson_id: str, completed: bool = True) -> None:
+    def lesson_step(self, lesson_id: str) -> int:
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection:
+            row = connection.execute(
+                "SELECT step FROM lesson_progress WHERE lesson_id=?", (lesson_id,)
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    def set_lesson_completed(
+        self, lesson_id: str, completed: bool = True, *, step: int = 0
+    ) -> None:
         self.migrate()
         with closing(sqlite3.connect(self.path)) as connection, connection:
             connection.execute(
-                "INSERT INTO lesson_progress VALUES (?, ?, ?) ON CONFLICT(lesson_id) "
-                "DO UPDATE SET completed=excluded.completed, updated_at=excluded.updated_at",
-                (lesson_id, completed, _now()),
+                "INSERT INTO lesson_progress(lesson_id, completed, updated_at, step) "
+                "VALUES (?, ?, ?, ?) ON CONFLICT(lesson_id) DO UPDATE SET "
+                "completed=excluded.completed, updated_at=excluded.updated_at, step=excluded.step",
+                (lesson_id, completed, _now(), step),
             )
