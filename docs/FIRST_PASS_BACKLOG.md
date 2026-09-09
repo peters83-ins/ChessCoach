@@ -4,10 +4,9 @@ This is the working reference for turning the current engine, review, coaching,
 practice, and lesson modules into a coherent first release. Complete items roughly
 in priority order, keeping each numbered item independently reviewable.
 
-Implementation status: P0 items 1–7 and P1 items 8–13 are complete. Keep their
-acceptance details as regression requirements. P2 is the approved learning roadmap;
-implement each stage on its named branch and merge it only after focused and full-suite
-validation. P3 remains deferred.
+Implementation status: P0 items 1–7, P1 items 8–13, and P2 stages A–F are complete.
+Keep their acceptance details as regression requirements. Stage G remains the next
+roadmap item; P3 remains deferred.
 
 ## Release goal
 
