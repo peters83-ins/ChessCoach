@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from chesscoach.chess.openings import OpeningMatch
 from chesscoach.coach.insights import (
     analyzed_theme_counts,
+    opening_departure_transfer,
     opening_stats,
     period_comparison,
     phase_accuracy,
@@ -83,3 +84,17 @@ def test_phase_transfer_requires_recent_and_prior_samples():
     )
     result = phase_transfer(records, now=now)
     assert result == (("opening", 90.0, 60.0, 6),)
+
+
+def test_opening_departure_transfer_requires_recognized_games():
+    now = datetime(2026, 1, 31, tzinfo=UTC)
+    recent = tuple(
+        (("e2e4", "e7e5", "g1f3", "b8c6", "f1c4"), now - timedelta(days=days))
+        for days in (1, 2, 3)
+    )
+    prior = tuple(
+        (("e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "a7a6", "a2a3"), now - timedelta(days=60 + days))
+        for days in (1, 2, 3)
+    )
+    result = opening_departure_transfer(recent + prior, now=now)
+    assert result == (1.0, 5 / 7, 6)

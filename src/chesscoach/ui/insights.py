@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from chesscoach.chess.openings import OpeningMatch
 from chesscoach.coach.insights import (
     analyzed_theme_counts,
+    opening_departure_transfer,
     opening_stats,
     period_comparison,
     phase_accuracy,
@@ -77,6 +78,9 @@ class InsightsDialog(QDialog):
         self.phase_transfer_label = QLabel()
         self.phase_transfer_label.setWordWrap(True)
         layout.addWidget(self.phase_transfer_label)
+        self.opening_transfer_label = QLabel()
+        self.opening_transfer_label.setWordWrap(True)
+        layout.addWidget(self.opening_transfer_label)
         self.transfer = QLabel()
         self.transfer.setWordWrap(True)
         layout.addWidget(self.transfer)
@@ -145,6 +149,31 @@ class InsightsDialog(QDialog):
             else (
                 "Phase transfer comparisons require three recent and three earlier "
                 "analyzed moves per phase."
+            )
+        )
+        opening_records = []
+        for game in games:
+            data = self.database.load_game(game.id)
+            if data is None:
+                continue
+            try:
+                observed = datetime.fromisoformat(game.saved_at)
+            except ValueError:
+                continue
+            if observed.tzinfo is None:
+                observed = observed.replace(tzinfo=UTC)
+            opening_records.append((data.moves, observed))
+        opening_transfer = opening_departure_transfer(opening_records)
+        self.opening_transfer_label.setText(
+            (
+                f"Opening transfer: {opening_transfer[0]:.0%} of recent game plies "
+                f"followed a reviewed line vs {opening_transfer[1]:.0%} earlier "
+                f"({opening_transfer[2]} games)."
+            )
+            if opening_transfer
+            else (
+                "Opening transfer comparisons require three recent and three earlier "
+                "recognized games."
             )
         )
         due = len(self.repository.due_course_mastery()) + self.repository.practice_progress().due
