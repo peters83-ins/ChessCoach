@@ -46,6 +46,7 @@ from chesscoach.ui.diagnostics import DiagnosticInfo, DiagnosticsDialog
 from chesscoach.ui.evaluation_bar import EvaluationBar
 from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.game_review import GameReview
+from chesscoach.ui.insights import InsightsDialog
 from chesscoach.ui.learning_center import PracticeQueueDialog, WeaknessDashboardDialog
 from chesscoach.ui.learning_home import LearningHomeDialog
 from chesscoach.ui.match_setup import MatchSetup
@@ -131,6 +132,7 @@ class MainWindow(QMainWindow):
         self.lessons_action = QAction("Lessons", self)
         self.courses_action = QAction("Courses", self)
         self.learn_action = QAction("Learn", self)
+        self.insights_action = QAction("Insights", self)
         self.lessons_action.setToolTip("Personalized lessons generated from your analyzed games")
         self.courses_action.setToolTip("Reviewed offline opening courses")
         self.learn_action.setToolTip("Your recommended next learning activity")
@@ -142,6 +144,7 @@ class MainWindow(QMainWindow):
         self.lessons_action.setShortcut(QKeySequence("Ctrl+L"))
         self.courses_action.setShortcut(QKeySequence("Ctrl+Shift+L"))
         self.learn_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        self.insights_action.setShortcut(QKeySequence("Ctrl+I"))
         self.settings_action.setShortcut(QKeySequence.StandardKey.Preferences)
         for action in (
             self.play_action,
@@ -151,6 +154,7 @@ class MainWindow(QMainWindow):
             self.lessons_action,
             self.courses_action,
             self.learn_action,
+            self.insights_action,
             self.settings_action,
         ):
             navigation.addAction(action)
@@ -267,6 +271,7 @@ class MainWindow(QMainWindow):
         self.lessons_action.triggered.connect(self.open_lessons)
         self.courses_action.triggered.connect(self.open_courses)
         self.learn_action.triggered.connect(self.open_learning_home)
+        self.insights_action.triggered.connect(self.open_insights)
         self.settings_action.triggered.connect(self.open_settings)
         self.apply_preferences(self.preferences)
         self.refresh()
@@ -1000,6 +1005,12 @@ class MainWindow(QMainWindow):
 
     def open_learning_home(self) -> None:
         self._show_destination("learn", self._make_learning_home)
+
+    def open_insights(self) -> None:
+        self._show_destination(
+            "insights",
+            lambda: InsightsDialog(self.coach_repository, self.database, self.course_catalog, self),
+        )
 
     def _make_learning_home(self) -> LearningHomeDialog:
         dialog = LearningHomeDialog(self.coach_repository, self.course_catalog, self.database, self)
