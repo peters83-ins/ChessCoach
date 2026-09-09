@@ -41,8 +41,8 @@ active development queue.
   keep focused exercises and confirmations as dialogs.
 - Add a visible session completion state and theme/previously-failed filters to daily
   practice (implemented in the Practice Queue; failed-item IDs are stored locally).
-- Improve keyboard navigation across course controls and verify screen-reader labels
-  in a native Windows pass.
+- Add explicit screen-reader names and descriptions across course library, player,
+  and board controls; continue native Windows keyboard and screen-reader verification.
 
 ### Deferred P3
 
