@@ -1,6 +1,7 @@
 """Match setup, human/engine turns, and explicit persistence feedback."""
 
 import sqlite3
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -114,6 +115,7 @@ class MainWindow(QMainWindow):
         self.preferences = UserPreferences.load(self.preference_settings)
         self.course_catalog = course_catalog or CourseCatalog.built_in()
         self.first_run_wizard: FirstRunWizard | None = None
+        self.destination_dialogs: dict[str, QDialog] = {}
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
         navigation = QToolBar("Navigation", self)
@@ -973,22 +975,45 @@ class MainWindow(QMainWindow):
         self.set_review_index(ply)
 
     def open_practice(self) -> None:
-        PracticeQueueDialog(self.coach_repository, self, self.course_catalog).exec()
+        self._show_destination(
+            "practice",
+            lambda: PracticeQueueDialog(self.coach_repository, self, self.course_catalog),
+        )
 
     def open_lessons(self) -> None:
         lessons = self.coach_repository.lessons()
         if not lessons:
             self.statusBar().showMessage("No lessons yet. Analyze a game to create them.")
             return
-        LessonsDialog(lessons, self.coach_repository, self).exec()
+        self._show_destination(
+            "lessons", lambda: LessonsDialog(lessons, self.coach_repository, self)
+        )
 
     def open_courses(self) -> None:
-        CourseLibraryDialog(self.course_catalog, self.coach_repository, self).exec()
+        self._show_destination(
+            "courses", lambda: CourseLibraryDialog(self.course_catalog, self.coach_repository, self)
+        )
 
     def open_learning_home(self) -> None:
+        self._show_destination("learn", self._make_learning_home)
+
+    def _make_learning_home(self) -> LearningHomeDialog:
         dialog = LearningHomeDialog(self.coach_repository, self.course_catalog, self.database, self)
         dialog.action_requested.connect(self._learning_action)
-        dialog.exec()
+        return dialog
+
+    def _show_destination(self, key: str, factory: Callable[[], QDialog]) -> None:
+        existing = self.destination_dialogs.get(key)
+        if existing is not None:
+            existing.show()
+            existing.raise_()
+            existing.activateWindow()
+            return
+        dialog = factory()
+        self.destination_dialogs[key] = dialog
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
 
     def _learning_action(self, action: str) -> None:
         if action == "practice":
@@ -1001,7 +1026,10 @@ class MainWindow(QMainWindow):
                 (value for value in self.course_catalog.courses if value.id == course_id), None
             )
             if course is not None:
-                CourseDetailDialog(course, self.coach_repository, self).exec()
+                self._show_destination(
+                    f"course:{course_id}",
+                    lambda: CourseDetailDialog(course, self.coach_repository, self),
+                )
         elif action == "weaknesses":
             self.open_weaknesses()
         elif action == "latest":
@@ -1012,9 +1040,12 @@ class MainWindow(QMainWindow):
                     self.open_review(data)
 
     def open_weaknesses(self) -> None:
+        self._show_destination("weaknesses", self._make_weaknesses)
+
+    def _make_weaknesses(self) -> WeaknessDashboardDialog:
         dialog = WeaknessDashboardDialog(self.coach_repository, self)
         dialog.example_requested.connect(self.open_game_example)
-        dialog.exec()
+        return dialog
 
     def open_game_example(self, game_id: str, ply: int) -> None:
         try:
@@ -1087,6 +1118,9 @@ class MainWindow(QMainWindow):
         if not self.save_match():
             event.ignore()
             return
+        for dialog in tuple(self.destination_dialogs.values()):
+            dialog.close()
+        self.destination_dialogs.clear()
         self.cancel_pending_bot()
         self.runner.shutdown()
         self.coach_runner.shutdown()
