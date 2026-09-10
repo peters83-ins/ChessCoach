@@ -76,6 +76,12 @@ def test_settings_can_select_a_saved_learner_profile(app: QApplication, tmp_path
     assert dialog.current_preferences().profile_id == "student"
 
 
+def test_settings_exposes_manual_update_check(app: QApplication, tmp_path: Path) -> None:
+    dialog = SettingsDialog(Settings(), update_manifest_url="https://example.test/manifest.json")
+    assert dialog.update_button.text() == "Check for Updates"
+    assert "Updates are checked only" in dialog.update_status.text()
+
+
 def test_first_run_wizard_saves_playable_setup(app: QApplication, tmp_path: Path) -> None:
     engine = tmp_path / "stockfish.exe"
     engine.write_text("engine")

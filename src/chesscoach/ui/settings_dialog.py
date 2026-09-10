@@ -22,8 +22,10 @@ from PySide6.QtWidgets import (
 
 from chesscoach.ai.client import test_connection
 from chesscoach.config import Settings, apply_process_settings, save_local_settings
+from chesscoach.distribution import current_version, runtime_paths
 from chesscoach.preferences import UserPreferences
 from chesscoach.storage.coach import CoachRepository
+from chesscoach.update_checker import UpdateChecker, UpdateCheckError, UpdateCheckResult
 
 
 class ConnectionWorker(QThread):
@@ -42,6 +44,21 @@ class ConnectionWorker(QThread):
             self.completed.emit(True, "Ready")
 
 
+class UpdateWorker(QThread):
+    completed = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, checker: UpdateChecker, parent: QDialog | None = None) -> None:
+        super().__init__(parent)
+        self.checker = checker
+
+    def run(self) -> None:
+        try:
+            self.completed.emit(self.checker.check(force=True))
+        except UpdateCheckError as error:
+            self.failed.emit(str(error))
+
+
 class SettingsDialog(QDialog):
     settings_saved = Signal(object)
     preferences_saved = Signal(object)
@@ -53,6 +70,9 @@ class SettingsDialog(QDialog):
         preferences: UserPreferences | None = None,
         preference_settings: QSettings | None = None,
         repository: CoachRepository | None = None,
+        update_manifest_url: str = (
+            "https://github.com/peters83-ins/ChessCoach/releases/latest/download/manifest.json"
+        ),
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -60,6 +80,8 @@ class SettingsDialog(QDialog):
         self.preferences = preferences or UserPreferences()
         self.preference_settings = preference_settings
         self.worker: ConnectionWorker | None = None
+        self.update_worker: UpdateWorker | None = None
+        self.update_manifest_url = update_manifest_url
         self.setWindowTitle("Chess Coach Settings")
         layout = QVBoxLayout(self)
         note = QLabel(
@@ -151,12 +173,17 @@ class SettingsDialog(QDialog):
         actions = QHBoxLayout()
         self.key_page_button = QPushButton("Open API key page")
         self.test_button = QPushButton("Test OpenAI")
+        self.update_button = QPushButton("Check for Updates")
         actions.addWidget(self.key_page_button)
         actions.addWidget(self.test_button)
+        actions.addWidget(self.update_button)
         layout.addLayout(actions)
         self.status = QLabel(self._readiness_text())
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        self.update_status = QLabel("Updates are checked only when requested.")
+        self.update_status.setWordWrap(True)
+        layout.addWidget(self.update_status)
         estimate = QLabel(
             "Cloud coaching is opt-in per review. It sends selected critical positions, "
             "usually a few short requests per game; API usage is billed by OpenAI."
@@ -173,6 +200,7 @@ class SettingsDialog(QDialog):
             lambda: QDesktopServices.openUrl(QUrl("https://platform.openai.com/api-keys"))
         )
         self.test_button.clicked.connect(self._test)
+        self.update_button.clicked.connect(self._check_updates)
         self.api_key.textChanged.connect(lambda: self.status.setText(self._readiness_text()))
         self.model.textChanged.connect(lambda: self.status.setText(self._readiness_text()))
         buttons.accepted.connect(self._save)
@@ -243,6 +271,45 @@ class SettingsDialog(QDialog):
         if self.worker is not None:
             self.worker.deleteLater()
             self.worker = None
+
+    def _check_updates(self) -> None:
+        self.update_button.setEnabled(False)
+        self.update_status.setText("Checking for updates…")
+        checker = UpdateChecker(
+            self.update_manifest_url,
+            current_version(),
+            runtime_paths().data_dir / "update-cache.json",
+        )
+        self.update_worker = UpdateWorker(checker, self)
+        self.update_worker.completed.connect(self._updates_finished)
+        self.update_worker.failed.connect(self._updates_failed)
+        self.update_worker.start()
+
+    def _updates_finished(self, result: UpdateCheckResult) -> None:
+        self.update_button.setEnabled(True)
+        if result.update is None:
+            self.update_status.setText("Updates: You are up to date.")
+            if self.update_worker is not None:
+                self.update_worker.deleteLater()
+                self.update_worker = None
+            return
+        update = result.update
+        self.update_status.setText(f"Update available: Chess Coach {update.latest_version}.")
+        self.update_button.setText("Open Release")
+        self.update_button.clicked.disconnect(self._check_updates)
+        self.update_button.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(update.installer_url))
+        )
+        if self.update_worker is not None:
+            self.update_worker.deleteLater()
+            self.update_worker = None
+
+    def _updates_failed(self, message: str) -> None:
+        self.update_button.setEnabled(True)
+        self.update_status.setText(f"Updates: {message}.")
+        if self.update_worker is not None:
+            self.update_worker.deleteLater()
+            self.update_worker = None
 
     def _save(self) -> None:
         settings = self.current_settings()
