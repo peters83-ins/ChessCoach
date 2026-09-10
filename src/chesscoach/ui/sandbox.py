@@ -7,8 +7,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QSpinBox,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -179,4 +179,7 @@ def format_position_analysis(analysis: PositionAnalysis) -> str:
         san_moves.append(board.san(move))
         board.push(move)
     score = candidate.score.white()
-    return f"Best line: {' '.join(san_moves) or 'No move'} · Evaluation: {score} · Depth: {candidate.depth}"
+    return (
+        f"Best line: {' '.join(san_moves) or 'No move'} · "
+        f"Evaluation: {score} · Depth: {candidate.depth}"
+    )
