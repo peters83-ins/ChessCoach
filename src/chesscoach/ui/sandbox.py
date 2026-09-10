@@ -1,7 +1,7 @@
 """Self-analysis board for exploring positions and requesting local engine lines."""
 
 import chess
-from PySide6.QtCore import QCloseEvent
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
