@@ -11,13 +11,13 @@ regression scope; the staged backlog below is the active queue.
 - Python 3.12+, python-chess, Stockfish, PySide6, SQLite, and optional OpenAI feedback.
 - Stockfish and python-chess are authoritative for legality, evaluation, and tactics.
 - OpenAI is an optional explanation layer and must only receive verified facts.
-- Baseline validation: 200 passed on the Windows Python module test run, before
-  required real-engine execution.
+- Baseline validation: 211 passed in 39.72 seconds on the WSL Python 3.12 run,
+  including the required real Stockfish process and GUI tests.
 - Real-Stockfish tests are required and resolve `CHESSCOACH_TEST_STOCKFISH`,
   `STOCKFISH_PATH`, or normal app discovery. Missing executables fail clearly.
 - Stage 0 audit harness now covers every primary destination and the visible
   non-destructive controls in three repeated offscreen passes. The current full
-  run is 197 passed, 8 skipped, with aggregate coverage still at 88%.
+  run is 211 passed, with aggregate coverage still at 88%.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
   practice links, related-course links, Stage 3 direct learning routing, Stage 4
@@ -76,7 +76,7 @@ visual identity, reviewed offline content, and local-first data model.
 
 ## Prioritized roadmap
 
-### Stage 1 — Reliability and engine confidence
+### Stage 1 — Reliability and engine confidence (complete)
 
 Stage 0 baseline work is complete on `audit/baseline-harness`; the remaining items
 below are the final reliability checks for this release.
@@ -100,9 +100,10 @@ must run on a machine with an installed executable.
 The recovery suite also verifies a saved match can be reopened in a fresh window with
 its validated move history and review position intact. Full install and real-engine
 matrix execution remain environment-dependent checks.
-Timeout exceptions now have a deterministic retryable-error regression test. The only
-remaining Stage 1 execution item is running the real-Stockfish matrix on a machine with
-an installed executable.
+Timeout exceptions now have a deterministic retryable-error regression test. The
+real-Stockfish matrix passes for 800, 1000, 1200, and full-strength profiles using
+Stockfish 19 installed in the app engine-discovery directory. Stage 0’s aggregate
+coverage target and native screen-reader verification remain separate release checks.
 Settings now selects a persisted learner profile, and the selected profile flows through
 coaching records, practice, courses, lessons, learning home, insights, and weakness
 views while defaulting safely to the existing local profile.
