@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFrame,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -260,23 +261,40 @@ class MainWindow(QMainWindow):
         self.diagnostics_button = QPushButton("Diagnostics")
         for button in (self.new_game_button, self.save_button, self.review_game_button):
             button.setObjectName("primaryAction")
-        for button in (
+        primary_buttons = (
             self.new_game_button,
             self.undo_button,
             self.claim_draw_button,
             self.copy_pgn_button,
             self.save_button,
+            self.review_game_button,
+        )
+        for button in primary_buttons:
+            sidebar.addWidget(button)
+        self.tools_group = QGroupBox("Tools & data")
+        self.tools_group.setCheckable(True)
+        self.tools_group.setChecked(False)
+        self.tools_group.setAccessibleName("Tools and data")
+        tools_layout = QVBoxLayout(self.tools_group)
+        tool_buttons = (
             self.load_button,
             self.import_pgn_button,
             self.sandbox_button,
             self.backup_button,
             self.restore_button,
             self.retry_button,
-            self.review_game_button,
-            self.settings_button,
-            self.diagnostics_button,
-        ):
-            sidebar.addWidget(button)
+        )
+        for button in tool_buttons:
+            tools_layout.addWidget(button)
+            button.setVisible(False)
+        def toggle_tools(visible: bool) -> None:
+            for button in tool_buttons:
+                button.setVisible(visible)
+
+        self.tools_group.toggled.connect(toggle_tools)
+        sidebar.addWidget(self.tools_group)
+        sidebar.addWidget(self.settings_button)
+        sidebar.addWidget(self.diagnostics_button)
         self.new_game_button.clicked.connect(self.new_game)
         self.undo_button.clicked.connect(self.undo)
         self.claim_draw_button.clicked.connect(self.claim_draw)
