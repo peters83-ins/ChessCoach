@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 from threading import Event
 
 import chess
@@ -18,6 +19,15 @@ class SearchResult:
     move: chess.Move | None
     actual_elo: int
     engine_signature: str = "Stockfish"
+
+
+class WorkerState(StrEnum):
+    IDLE = "idle"
+    SEARCHING = "searching"
+    READY = "ready"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+    CLOSED = "closed"
 
 
 class EngineWorker(QThread):
@@ -81,9 +91,13 @@ class EngineRunner(QObject):
         super().__init__(parent)
         self.generation = 0
         self.workers: list[EngineWorker] = []
+        self.state = WorkerState.IDLE
+        self.last_error = ""
 
     def search(self, position: chess.Board, path: str, elo: int, play: bool) -> None:
         self.cancel()
+        self.last_error = ""
+        self.state = WorkerState.SEARCHING
         worker = EngineWorker(self.generation, position, path, elo, play, self)
         worker.result.connect(self._result)
         worker.error.connect(self._error)
@@ -101,15 +115,20 @@ class EngineRunner(QObject):
     @Slot(int, object)
     def _result(self, generation: int, result: SearchResult) -> None:
         if generation == self.generation:
+            self.state = WorkerState.READY
             self.result.emit(result)
 
     @Slot(int, str)
     def _error(self, generation: int, error: str) -> None:
         if generation == self.generation:
+            self.state = WorkerState.FAILED
+            self.last_error = error
             self.error.emit(error)
 
     def cancel(self) -> None:
         self.generation += 1
+        if self.workers:
+            self.state = WorkerState.CANCELLED
         for worker in self.workers:
             worker.cancel()
 
@@ -117,3 +136,4 @@ class EngineRunner(QObject):
         self.cancel()
         for worker in self.workers:
             worker.wait()  # Searches are cancelled; UCI startup is bounded by its timeout.
+        self.state = WorkerState.CLOSED

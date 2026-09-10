@@ -452,6 +452,7 @@ class MainWindow(QMainWindow):
             self.engine_signature,
             ai_ready,
             self.last_error,
+            f"engine={self.runner.state}; coach={self.coach_runner.state}",
         )
         return DiagnosticsDialog(
             info,
