@@ -90,9 +90,11 @@ The audit harness emits structured `AuditReport`/`AuditFinding` JSON so each fut
 stress run can be attached to the finding table without relying on console prose.
 
 Engine and coaching runners now expose explicit idle/searching/ready/cancelled/failed/
-closed states and preserve the last worker error for diagnostics. The full lifecycle
-state contract is covered by focused tests; timeout and real-Stockfish matrix coverage
-remain opt-in follow-up checks.
+closed states and preserve the last worker error for diagnostics. Focused tests cover
+stale generation rejection, cancellation invalidation, malformed output, and startup
+crashes. The sandbox also has deterministic tests for legal output, terminal positions,
+and stale FEN results. Timeout and real-Stockfish matrix coverage remain opt-in follow-up
+checks because the normal CI path uses fake engines.
 Settings now selects a persisted learner profile, and the selected profile flows through
 coaching records, practice, courses, lessons, learning home, insights, and weakness
 views while defaulting safely to the existing local profile.
