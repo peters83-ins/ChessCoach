@@ -295,3 +295,27 @@ def test_load_button_reports_empty_database(bot: tuple[MainWindow, FakeRunner]) 
     window, _ = bot
     window.load_button.click()
     assert window.statusBar().currentMessage().startswith("No saved games found in")
+
+
+def test_saved_match_reopens_in_a_fresh_window_for_review(
+    bot: tuple[MainWindow, FakeRunner], tmp_path: Path
+) -> None:
+    window, runner = bot
+    window.start_match()
+    human_move(window, "e2", "e4")
+    runner.respond("e7e5")
+    assert window.save_match()
+    game_id = window.match.id if window.match is not None else ""
+    assert game_id
+    window.close()
+
+    reopened = MainWindow(
+        database=GameDatabase(tmp_path / "matches.sqlite3"), runner=FakeRunner()
+    )
+    data = reopened.database.load_game(game_id)
+    assert data is not None
+    reopened.open_review(data)
+    assert [move.san for move in reopened.game.history()] == ["e4", "e5"]
+    assert reopened.review is not None
+    assert reopened.review.total == 2
+    reopened.close()
