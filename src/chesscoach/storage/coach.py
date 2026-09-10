@@ -988,7 +988,7 @@ class CoachRepository:
         self.migrate()
         now = datetime.now(UTC)
         current_level = 0
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(sqlite3.connect(self.path)) as connection, connection:
             existing = connection.execute(
                 "SELECT level FROM course_mastery WHERE profile_id=? AND course_id=? "
                 "AND exercise_id=? AND decision_index=?",
@@ -996,8 +996,7 @@ class CoachRepository:
             ).fetchone()
             if existing:
                 current_level = int(existing[0])
-        due = next_course_due(current_level + (1 if correct else 0), correct, now)
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+            due = next_course_due(current_level + (1 if correct else 0), correct, now)
             connection.execute(
                 "INSERT INTO course_attempts(profile_id, course_id, exercise_id, decision_index, "
                 "attempted_at, move_uci, correct, hints) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
