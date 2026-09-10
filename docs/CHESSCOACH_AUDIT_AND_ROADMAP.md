@@ -188,6 +188,35 @@ selection; Back and Forward remain separate keyboard-accessible actions.
   output, explicit loading/cancel/error states, terminal-position handling, and FEN
   checks that reject stale results.
 
+### Stage 7 — Deep codebase cleanup and consistency
+
+**Branch:** `refactor/codebase-cleanup`
+
+- Inventory modules, public functions, signals, settings keys, database migrations,
+  and UI actions; remove unreachable, duplicated, stale, and abandoned code only when
+  tests prove it is unused.
+- Split remaining oversized UI orchestration into focused services and presenters;
+  keep chess rules, engine calls, persistence, coaching, and Qt rendering behind
+  explicit interfaces.
+- Standardize naming, type annotations, exception boundaries, signal signatures,
+  logging, user-facing error messages, and return-value contracts.
+- Replace magic numbers and duplicated labels/colors with shared constants or theme
+  tokens. Keep comments focused on decisions and invariants rather than restating code.
+- Add or refresh module and public-API docstrings, architecture diagrams, migration
+  notes, and examples so documentation matches current behavior.
+- Remove stale imports, dead assets, obsolete compatibility paths, and generated files;
+  preserve backward-compatible data migrations and user-visible settings.
+- Run a dependency and license audit, check packaging from a clean checkout, and make
+  resource ownership explicit for SQLite connections, timers, threads, and Stockfish
+  processes.
+- Require focused tests for every cleanup, warning-clean application-owned resources,
+  Ruff, mypy, full tests, real Stockfish tests, and a final audit diff before merge.
+
+**Acceptance:** No known dead path remains without an issue reference; changed modules
+meet the targeted coverage gate; public interfaces have type/doc coverage; full tests,
+real Stockfish, lint, mypy, and packaging checks pass; and the GUI behavior is unchanged
+outside explicitly documented cleanup fixes.
+
 ## Acceptance and delivery
 
 - Preserve the full passing suite as regression coverage.
