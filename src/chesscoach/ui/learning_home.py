@@ -90,9 +90,7 @@ class LearningHomeDialog(QDialog):
         if action == "continue":
             due = self.repository.due_course_mastery()
             if due:
-                self.action_requested.emit(
-                    f"course:{due[0].course_id}:{due[0].exercise_id}"
-                )
+                self.action_requested.emit(f"course:{due[0].course_id}:{due[0].exercise_id}")
                 self.accept()
                 return
             progress = self.repository.course_progress()

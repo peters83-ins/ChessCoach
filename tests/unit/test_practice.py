@@ -22,9 +22,7 @@ def test_practice_levels_have_distinct_error_rates_and_legal_choices() -> None:
             analysis = PositionAnalysis(f"sample-{sample}", candidates)
             chosen = practice_move(analysis, chess.WHITE, level, rng=random.Random(sample))
             assert chosen in board.legal_moves
-            assert practice_move(
-                analysis, chess.WHITE, level, rng=random.Random(sample)
-            ) == chosen
+            assert practice_move(analysis, chess.WHITE, level, rng=random.Random(sample)) == chosen
             selections[moves.index(chosen)] += 1
         losses[level] = sum(index * count for index, count in selections.items())
     assert losses[800] > losses[1000] > losses[1200]
@@ -47,14 +45,11 @@ def test_practice_selection_can_vary_for_identical_position() -> None:
     analysis = PositionAnalysis(
         "same-position",
         tuple(
-            CandidateLine(
-                chess.engine.PovScore(chess.engine.Cp(0), chess.WHITE), (move,), 8
-            )
+            CandidateLine(chess.engine.PovScore(chess.engine.Cp(0), chess.WHITE), (move,), 8)
             for move in moves
         ),
     )
     choices = {
-        practice_move(analysis, chess.WHITE, 1000, rng=random.Random(seed))
-        for seed in range(12)
+        practice_move(analysis, chess.WHITE, 1000, rng=random.Random(seed)) for seed in range(12)
     }
     assert len(choices) > 1
