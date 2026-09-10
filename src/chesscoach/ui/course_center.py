@@ -295,6 +295,8 @@ class CoursePlayerDialog(QDialog):
             return
         move = move_stack[-1]
         result = self.session.attempt(move)
+        if result.mistake:
+            self.hints_used = min(3, self.hints_used + 1)
         self.repository.record_course_attempt(
             self.course.id,
             self.course.exercises[self.exercise_index].id,
@@ -306,7 +308,6 @@ class CoursePlayerDialog(QDialog):
         self._update_mastery()
         if result.mistake:
             self.status.setText("Mistake — try this decision again.")
-            self.hints_used = min(3, self.hints_used + 1)
             QTimer.singleShot(700, self._rollback)
         elif result.completed:
             self.status.setText("Completed. Review the idea, then continue.")
