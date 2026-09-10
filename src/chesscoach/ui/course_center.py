@@ -154,6 +154,10 @@ class CourseDetailDialog(QDialog):
         self.progress = QLabel()
         self.progress.setAccessibleName("Course progress")
         layout.addWidget(self.progress)
+        self.mastery = QLabel()
+        self.mastery.setAccessibleName("Course decision mastery")
+        self.mastery.setWordWrap(True)
+        layout.addWidget(self.mastery)
         self.start = QPushButton("Start")
         self.start.setAccessibleName("Start or continue course")
         layout.addWidget(self.start)
@@ -165,6 +169,24 @@ class CourseDetailDialog(QDialog):
         self.progress.setText(
             "Enrolled — continue where you left off." if progress else "Not started"
         )
+        mastery = self.repository.course_mastery(self.course.id) if progress else ()
+        if mastery:
+            mastered = sum(item.level > 0 for item in mastery)
+            completed_exercises = sum(
+                all(
+                    item.last_result == "correct"
+                    for item in mastery
+                    if item.exercise_id == exercise.id
+                )
+                for exercise in self.course.exercises
+                if any(item.exercise_id == exercise.id for item in mastery)
+            )
+            self.mastery.setText(
+                f"Decision mastery: {mastered}/{len(mastery)} · "
+                f"Exercises completed: {completed_exercises}/{len(self.course.exercises)}"
+            )
+        else:
+            self.mastery.setText("Decision mastery: 0/0 · Exercises completed: 0")
         self.start.setText("Continue" if progress else "Start")
 
     def start_course(self) -> None:
@@ -219,6 +241,9 @@ class CoursePlayerDialog(QDialog):
         self.status = QLabel()
         self.status.setAccessibleName("Course exercise status")
         layout.addWidget(self.status)
+        self.mastery = QLabel()
+        self.mastery.setAccessibleName("Current decision mastery")
+        layout.addWidget(self.mastery)
         controls = QHBoxLayout()
         self.hint = QPushButton("Hint")
         self.hint.setAccessibleName("Show progressive course hint")
@@ -257,43 +282,36 @@ class CoursePlayerDialog(QDialog):
             f"{exercise.explanation}"
         )
         self.status.setText("Your move. Select a piece, then a destination.")
+        self._update_mastery()
         self.next_button.setEnabled(False)
         self.board.input_allowed = True
         self.board.refresh()
 
     def on_move(self) -> None:
         if self.session.completed:
-            self.status.setText("Completed. Review the idea, then continue.")
-            self.next_button.setEnabled(True)
-            self.board.input_allowed = False
-            self.repository.record_course_attempt(
-                self.course.id,
-                self.course.exercises[self.exercise_index].id,
-                self.session.decision_index,
-                "",
-                True,
-                self.hints_used,
-            )
             return
         move_stack = self.session.game.position.move_stack
         if not move_stack:
             return
         move = move_stack[-1]
         result = self.session.attempt(move)
+        self.repository.record_course_attempt(
+            self.course.id,
+            self.course.exercises[self.exercise_index].id,
+            result.decision_index,
+            move.uci(),
+            result.correct,
+            self.hints_used,
+        )
+        self._update_mastery()
         if result.mistake:
             self.status.setText("Mistake — try this decision again.")
             self.hints_used = min(3, self.hints_used + 1)
             QTimer.singleShot(700, self._rollback)
-            self.repository.record_course_attempt(
-                self.course.id,
-                self.course.exercises[self.exercise_index].id,
-                result.decision_index,
-                move.uci(),
-                False,
-                self.hints_used,
-            )
         elif result.completed:
-            self.on_move()
+            self.status.setText("Completed. Review the idea, then continue.")
+            self.next_button.setEnabled(True)
+            self.board.input_allowed = False
         else:
             self.status.setText("Correct. Follow the reply, then find the next move.")
 
@@ -306,6 +324,27 @@ class CoursePlayerDialog(QDialog):
         self.hints_used = min(len(exercise.hints), self.hints_used + 1)
         self.status.setText(
             exercise.hints[self.hints_used - 1] if self.hints_used else "Look for the course idea."
+        )
+
+    def _update_mastery(self) -> None:
+        exercise = self.course.exercises[self.exercise_index]
+        decisions = tuple(
+            item
+            for item in self.repository.course_mastery(self.course.id)
+            if item.exercise_id == exercise.id
+        )
+        current = next(
+            (item for item in decisions if item.decision_index == self.session.decision_index),
+            None,
+        )
+        if current is None:
+            self.mastery.setText(
+                f"Decision {self.session.decision_index + 1} · No attempts recorded"
+            )
+            return
+        self.mastery.setText(
+            f"Decision {current.decision_index + 1} · Level {current.level} · "
+            f"Attempts {current.attempts} · Errors {current.errors} · Hints {current.hints}"
         )
 
     def next_exercise(self) -> None:

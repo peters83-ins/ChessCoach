@@ -50,6 +50,7 @@ class TrainingSession:
         """Process a move, whether the board already applied it or not."""
         if self.completed:
             raise ValueError("This training session is already complete.")
+        decision_index = self.decision_index
         if not self._move_is_applied(move):
             if not self.game.attempt_move(move):
                 raise ValueError("The attempted move is illegal in the training position.")
@@ -65,7 +66,7 @@ class TrainingSession:
                 "Mistake. Try this decision again from the previous position.",
                 self._checkpoint_fen,
                 None,
-                self.decision_index,
+                decision_index,
             )
 
         alternative_line = self._alternative_line(move)
@@ -89,7 +90,7 @@ class TrainingSession:
             "Correct so far. Continue the idea after the engine reply.",
             self._checkpoint_fen,
             forced_reply,
-            self.decision_index,
+            decision_index,
         )
 
     def _move_is_applied(self, move: chess.Move) -> bool:

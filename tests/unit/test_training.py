@@ -25,7 +25,7 @@ def item(**changes: object) -> PracticeItem:
 def test_wrong_move_rolls_back_only_current_decision() -> None:
     session = TrainingSession(item())
     first = session.attempt(chess.Move.from_uci("e2e4"))
-    assert first.correct and first.forced_reply == "e7e5"
+    assert first.correct and first.decision_index == 0 and first.forced_reply == "e7e5"
     assert (
         session.game.fen
         == chess.Board("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2").fen()
@@ -37,7 +37,7 @@ def test_wrong_move_rolls_back_only_current_decision() -> None:
     assert session.game.fen == first.rollback_fen
 
     final = session.attempt(chess.Move.from_uci("g1f3"))
-    assert final.completed
+    assert final.completed and final.decision_index == 1
 
 
 def test_alternative_line_is_accepted_at_each_decision() -> None:

@@ -1,10 +1,11 @@
 from pathlib import Path
 
+import chess
 from PySide6.QtWidgets import QApplication
 
 from chesscoach.courses.catalog import CourseCatalog
 from chesscoach.storage.coach import CoachRepository
-from chesscoach.ui.course_center import CourseLibraryDialog, CoursePlayerDialog
+from chesscoach.ui.course_center import CourseDetailDialog, CourseLibraryDialog, CoursePlayerDialog
 
 
 def catalog() -> CourseCatalog:
@@ -55,8 +56,18 @@ def test_course_library_filters_and_player_starts(app: QApplication, tmp_path: P
     assert library.list.count() == 1
     player = CoursePlayerDialog(catalog().courses[0], repository)
     assert player.status.text().startswith("Your move")
+    assert player.mastery.text().startswith("Decision 1")
     assert player.board.accessibleName() == "Course exercise chess board"
     assert player.hint.accessibleName() == "Show progressive course hint"
     assert ": Black rook" in player.board.squares[next(iter(player.board.squares))].accessibleName()
+    player.board.select_square(chess.E2)
+    player.board.select_square(chess.E4)
+    mastery = repository.course_mastery("demo")
+    assert mastery[0].decision_index == 0
+    assert mastery[0].attempts == 1
+    assert mastery[0].last_result == "correct"
     player.close()
+    detail = CourseDetailDialog(catalog().courses[0], repository)
+    assert "Decision mastery: 0/0" in detail.mastery.text()
+    detail.close()
     library.close()
