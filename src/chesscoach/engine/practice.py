@@ -2,14 +2,13 @@
 
 import math
 import random
-from typing import TypeAlias
 
 import chess
 
 from chesscoach.engine.analysis import PositionAnalysis
 
 TEMPERATURES = {800: 180.0, 1000: 100.0, 1200: 45.0}
-RandomSource: TypeAlias = random.Random | random.SystemRandom
+type RandomSource = random.Random | random.SystemRandom
 
 
 def practice_move(
