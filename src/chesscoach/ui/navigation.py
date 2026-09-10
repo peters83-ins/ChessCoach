@@ -124,5 +124,4 @@ class WorkspaceNavigator:
         self._current = None
         for page in tuple(self.pages.values()):
             page.close()
-            page.deleteLater()
         self.pages.clear()

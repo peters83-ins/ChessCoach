@@ -13,6 +13,10 @@ def test_modern_theme_is_applied_to_primary_actions(app: QApplication, tmp_path:
     assert window.new_game_button.objectName() == "primaryAction"
     assert window.save_button.objectName() == "primaryAction"
     assert window.setup.start_button.objectName() == "primaryAction"
+    assert not window.tools_group.isChecked()
+    assert not window.load_button.isVisible()
+    assert "QScrollBar::handle:vertical" in MODERN_STYLESHEET
+    assert "font-family" in MODERN_STYLESHEET
     window.close()
 
 

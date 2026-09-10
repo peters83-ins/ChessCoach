@@ -15,7 +15,7 @@ regression scope; the staged backlog below is the active queue.
 - Real-Stockfish tests are opt-in through `CHESSCOACH_TEST_STOCKFISH`.
 - Stage 0 audit harness now covers every primary destination and the visible
   non-destructive controls in three repeated offscreen passes. The current full
-  run is 190 passed, 8 skipped, with aggregate coverage still at 88%.
+  run is 192 passed, 8 skipped, with aggregate coverage still at 88%.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
   practice links, related-course links, Stage 3 direct learning routing, Stage 4
@@ -99,6 +99,9 @@ stress run can be attached to the finding table without relying on console prose
   unsaved-work handling.
 - Add rapid-switching and repeated-click GUI tests (initial coverage is in place).
 
+The typed workspace navigator, bounded Back/Forward history, page reuse, and
+conservative Qt shutdown cleanup are implemented and covered by unit and stress tests.
+
 ### Stage 3 — Review and learning parity (complete)
 
 - Learn routes directly to the first due course decision, then the last-opened module,
@@ -134,6 +137,9 @@ stress run can be attached to the finding table without relying on console prose
 - The Windows Qt test run verifies the keyboard and accessibility contract in the
   supported desktop runtime; manual screen-reader testing remains an operational check
   for release machines rather than an untested code path.
+- The visual-system slice now defines typography, focus/disabled/selected states,
+  styled scrollbars, sliders, progress bars, table rows, tooltips, and a collapsed
+  Tools & data group so the Play workspace presents fewer secondary controls.
 
 ### Stage 6 — Extensions (complete)
 
