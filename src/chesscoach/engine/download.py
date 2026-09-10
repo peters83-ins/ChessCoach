@@ -1,6 +1,8 @@
 """Verified, atomic Stockfish downloads for first-run setup."""
 
 import hashlib
+import stat
+import subprocess
 import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -28,7 +30,13 @@ class EngineArtifact:
         digest = self.sha256.lower()
         if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
             raise EngineDownloadError("The configured Stockfish checksum is invalid.")
-        if not self.url.startswith("https://") or not self.filename.strip():
+        if (
+            not self.url.startswith("https://")
+            or not self.filename.strip()
+            or Path(self.filename).name != self.filename
+            or not self.version.strip()
+            or not self.license_url.startswith("https://")
+        ):
             raise EngineDownloadError("The configured Stockfish download is invalid.")
 
 
@@ -95,6 +103,7 @@ def extract_engine_archive(
     *,
     executable_name: str = "stockfish.exe",
     max_bytes: int = DEFAULT_MAX_ENGINE_BYTES,
+    validator: Callable[[Path], None] | None = None,
 ) -> Path:
     """Safely extract one engine executable from a verified archive."""
     if max_bytes < 1:
@@ -111,6 +120,8 @@ def extract_engine_archive(
             if len(candidates) != 1:
                 raise EngineDownloadError("The Stockfish archive has no unique executable.")
             info = candidates[0]
+            if stat.S_ISLNK(info.external_attr >> 16):
+                raise EngineDownloadError("The Stockfish archive contains a symbolic link.")
             if info.file_size > max_bytes:
                 raise EngineDownloadError("Stockfish executable is larger than the safety limit.")
             with source.open(info) as input_file, temporary.open("wb") as output:
@@ -122,6 +133,8 @@ def extract_engine_archive(
                             "Stockfish executable is larger than the safety limit."
                         )
                     output.write(chunk)
+        if validator is not None:
+            validator(temporary)
         temporary.replace(destination)
         return destination
     except EngineDownloadError:
@@ -132,17 +145,40 @@ def extract_engine_archive(
         raise EngineDownloadError(f"Could not extract Stockfish: {error}") from error
 
 
+def validate_uci_engine(path: Path, *, timeout: float = 5.0) -> None:
+    """Run a bounded UCI handshake without invoking a shell."""
+    if timeout <= 0:
+        raise ValueError("UCI validation timeout must be positive.")
+    process: subprocess.Popen[bytes] | None = None
+    try:
+        process = subprocess.Popen(
+            [str(path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        output, _ = process.communicate(b"uci\nquit\n", timeout=timeout)
+        if b"uciok" not in output or b"id name" not in output:
+            raise EngineDownloadError("Stockfish failed the UCI handshake.")
+    except (OSError, subprocess.TimeoutExpired) as error:
+        if process is not None:
+            process.kill()
+            process.communicate()
+        raise EngineDownloadError("Stockfish did not start correctly.") from error
+
+
 def install_engine_archive(
     artifact: EngineArtifact,
     destination: Path,
     *,
     opener: OpenUrl = urlopen,
     cancelled: Event | None = None,
+    validator: Callable[[Path], None] = validate_uci_engine,
 ) -> Path:
     """Verify an archive and install its executable without partial files."""
     archive = destination.parent / artifact.filename
     try:
         download_engine(artifact, archive, opener=opener, cancelled=cancelled)
-        return extract_engine_archive(archive, destination)
+        return extract_engine_archive(archive, destination, validator=validator)
     finally:
         archive.unlink(missing_ok=True)

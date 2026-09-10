@@ -72,6 +72,8 @@ def test_install_removes_verified_archive_after_extraction(tmp_path: Path) -> No
             return chunk
 
     destination = tmp_path / "engine" / "stockfish.exe"
-    install_engine_archive(artifact, destination, opener=lambda request: Response())
+    install_engine_archive(
+        artifact, destination, opener=lambda request: Response(), validator=lambda path: None
+    )
     assert destination.read_bytes() == b"uci"
     assert not (tmp_path / "engine" / "stockfish.zip").exists()

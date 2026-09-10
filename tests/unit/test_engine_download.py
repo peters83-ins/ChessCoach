@@ -4,7 +4,12 @@ from threading import Event
 
 import pytest
 
-from chesscoach.engine.download import EngineArtifact, EngineDownloadError, download_engine
+from chesscoach.engine.download import (
+    EngineArtifact,
+    EngineDownloadError,
+    download_engine,
+    validate_uci_engine,
+)
 
 
 def artifact(content: bytes = b"stockfish") -> EngineArtifact:
@@ -55,6 +60,14 @@ def test_artifact_rejects_non_https_or_bad_digest() -> None:
         EngineArtifact("http://example.test/file", "file", "0" * 64, "1", "license").validate()
     with pytest.raises(EngineDownloadError):
         EngineArtifact("https://example.test/file", "file", "bad", "1", "license").validate()
+    with pytest.raises(EngineDownloadError):
+        EngineArtifact(
+            "https://example.test/file", "../file", "0" * 64, "1", "https://license"
+        ).validate()
+    with pytest.raises(EngineDownloadError):
+        EngineArtifact(
+            "https://example.test/file", "file", "0" * 64, "1", "http://license"
+        ).validate()
 
 
 class RedirectingResponse(BytesIO):
@@ -79,3 +92,28 @@ def test_download_size_limit_removes_partial_file(tmp_path: Path) -> None:
         )
     assert not target.exists()
     assert not target.with_suffix(".download").exists()
+
+
+def test_uci_validator_accepts_handshake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    class Process:
+        def communicate(self, input: bytes, timeout: float) -> tuple[bytes, bytes]:
+            return b"id name Stockfish 19\nuciok\n", b""
+
+    monkeypatch.setattr(
+        "chesscoach.engine.download.subprocess.Popen", lambda *args, **kwargs: Process()
+    )
+    validate_uci_engine(tmp_path / "stockfish.exe")
+
+
+def test_uci_validator_rejects_malformed_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Process:
+        def communicate(self, input: bytes, timeout: float) -> tuple[bytes, bytes]:
+            return b"id name unknown\n", b""
+
+    monkeypatch.setattr(
+        "chesscoach.engine.download.subprocess.Popen", lambda *args, **kwargs: Process()
+    )
+    with pytest.raises(EngineDownloadError, match="UCI handshake"):
+        validate_uci_engine(tmp_path / "stockfish.exe")
