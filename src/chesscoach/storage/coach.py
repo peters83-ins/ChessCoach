@@ -31,7 +31,7 @@ from chesscoach.coach.models import (
 from chesscoach.coach.practice import schedule_attempt
 from chesscoach.courses.models import Course, MoveMastery
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 DEFAULT_PROFILE_ID = "default"
 
 
@@ -139,6 +139,8 @@ class CoachRepository:
                 self._migration_three(connection)
             if version < 4:
                 self._migration_four(connection)
+            if version < 5:
+                self._migration_five(connection)
             if version < SCHEMA_VERSION:
                 connection.execute(
                     "INSERT INTO schema_versions VALUES ('coach', ?) "
@@ -209,6 +211,7 @@ class CoachRepository:
                 connection.execute(f"DELETE FROM {table} WHERE {column}=?", (profile_id,))
             connection.execute("DELETE FROM player_profiles WHERE id=?", (profile_id,))
         return True
+
     @staticmethod
     def _detect_schema_version(connection: sqlite3.Connection) -> int:
         exists = connection.execute(
@@ -325,6 +328,19 @@ class CoachRepository:
             "attempted_at TEXT NOT NULL, "
             "move_uci TEXT NOT NULL, correct INTEGER NOT NULL, hints INTEGER NOT NULL DEFAULT 0)"
         )
+
+    @staticmethod
+    def _migration_five(connection: sqlite3.Connection) -> None:
+        """Add indexes for the review and due-learning query paths."""
+        for statement in (
+            "CREATE INDEX IF NOT EXISTS weakness_events_profile_theme "
+            "ON weakness_events(profile_id, theme, created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS course_mastery_due "
+            "ON course_mastery(profile_id, due_at, course_id, exercise_id)",
+            "CREATE INDEX IF NOT EXISTS course_attempts_profile_time "
+            "ON course_attempts(profile_id, attempted_at DESC)",
+        ):
+            connection.execute(statement)
 
     def start_run(self, game_id: str, profile: AnalysisProfile) -> str:
         self.migrate()
@@ -988,7 +1004,7 @@ class CoachRepository:
         self.migrate()
         now = datetime.now(UTC)
         current_level = 0
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(sqlite3.connect(self.path)) as connection, connection:
             existing = connection.execute(
                 "SELECT level FROM course_mastery WHERE profile_id=? AND course_id=? "
                 "AND exercise_id=? AND decision_index=?",
@@ -996,8 +1012,7 @@ class CoachRepository:
             ).fetchone()
             if existing:
                 current_level = int(existing[0])
-        due = next_course_due(current_level + (1 if correct else 0), correct, now)
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+            due = next_course_due(current_level + (1 if correct else 0), correct, now)
             connection.execute(
                 "INSERT INTO course_attempts(profile_id, course_id, exercise_id, decision_index, "
                 "attempted_at, move_uci, correct, hints) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
