@@ -310,6 +310,8 @@ Confirm an installation from a terminal before opening the app:
 printf 'uci\nquit\n' | "$HOME/.local/share/ChessCoach/engines/stockfish"
 ```
 
+The packaged Windows release pins Stockfish 19's official x64 universal archive and verifies its SHA-256 before extraction. Stockfish is GPL-licensed; the release includes attribution and the license link. See the [official Stockfish download page](https://stockfishchess.org/download/) and [Stockfish source license](https://github.com/official-stockfish/Stockfish/blob/master/COPYING).
+
 Seeing an `id name Stockfish ...` response confirms the executable speaks UCI.
 Stockfish is authoritative for engine evaluations and moves; the optional language
 model only explains facts already verified by python-chess and Stockfish.
