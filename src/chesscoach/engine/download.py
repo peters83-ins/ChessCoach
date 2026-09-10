@@ -100,3 +100,19 @@ def extract_engine_archive(
     except (OSError, zipfile.BadZipFile, KeyError) as error:
         temporary.unlink(missing_ok=True)
         raise EngineDownloadError(f"Could not extract Stockfish: {error}") from error
+
+
+def install_engine_archive(
+    artifact: EngineArtifact,
+    destination: Path,
+    *,
+    opener: OpenUrl = urlopen,
+    cancelled: Event | None = None,
+) -> Path:
+    """Verify an archive and install its executable without partial files."""
+    archive = destination.parent / artifact.filename
+    try:
+        download_engine(artifact, archive, opener=opener, cancelled=cancelled)
+        return extract_engine_archive(archive, destination)
+    finally:
+        archive.unlink(missing_ok=True)
