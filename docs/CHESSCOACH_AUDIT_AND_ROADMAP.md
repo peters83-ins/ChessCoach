@@ -95,6 +95,9 @@ stale generation rejection, cancellation invalidation, malformed output, and sta
 crashes. The sandbox also has deterministic tests for legal output, terminal positions,
 and stale FEN results. Timeout and real-Stockfish matrix coverage remain opt-in follow-up
 checks because the normal CI path uses fake engines.
+The recovery suite also verifies a saved match can be reopened in a fresh window with
+its validated move history and review position intact. Full install and real-engine
+matrix execution remain environment-dependent checks.
 Settings now selects a persisted learner profile, and the selected profile flows through
 coaching records, practice, courses, lessons, learning home, insights, and weakness
 views while defaulting safely to the existing local profile.
