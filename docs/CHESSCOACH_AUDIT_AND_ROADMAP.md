@@ -16,7 +16,8 @@ regression scope; the staged backlog below is the active queue.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
   practice links, related-course links, Stage 3 direct learning routing, and Stage 4
-  per-decision mastery display and persistence.
+  per-decision mastery display and persistence. Stage 5 keyboard and responsive-layout
+  work is now covered by scripted Qt tests; native screen-reader verification remains.
 
 ## Audit findings
 
@@ -115,11 +116,16 @@ visual identity, reviewed offline content, and local-first data model.
 
 ### Stage 5 — Accessibility and visual polish
 
-- Verify tab order and shortcuts with scripted Qt tests and a native Windows pass.
-- Confirm focus visibility, contrast, scalable text, labels, descriptions, and
-  color-independent indicators.
-- Improve chart interaction, empty states, disabled-state explanations, and responsive
-  board/details layout.
+- Scripted Qt coverage now verifies primary tab order, evaluation-graph keyboard
+  navigation, accessible names/descriptions, visible focus styling, and square board
+  sizing while the window changes width.
+- Disabled primary actions now explain what the learner must do next, and empty filtered
+  practice/saved-game states expose actionable tooltips.
+- Evaluation graph, review controls, board squares, and course controls expose labels
+  and keyboard descriptions; native Windows keyboard and screen-reader verification is
+  still required before this stage can be marked complete.
+- Remaining work: complete a native Windows accessibility pass and inspect chart contrast
+  at the supported text-scaling settings.
 
 ### Stage 6 — Deferred extensions
 
