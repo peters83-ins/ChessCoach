@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chesscoach"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A local desktop chess trainer with independent chess, engine, and coaching layers"
 requires-python = ">=3.12"
 dependencies = [
@@ -23,6 +23,9 @@ chesscoach = "chesscoach.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "chesscoach.__version__"}
 
 [tool.setuptools.package-data]
 chesscoach = ["courses/content/*.json"]
