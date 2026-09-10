@@ -83,3 +83,16 @@ def test_full_strength_analysis_normalizes_score_and_validates_pv(engine: Stockf
             limit=chess.engine.Limit(time=0.1),
             root_moves=(chess.Move.from_uci("e2e5"),),
         )
+
+
+def test_beginner_play_caps_multipv_for_fast_responses(engine: Stockfish) -> None:
+    engine.configure_difficulty(800)
+    engine._engine.analyse.return_value = [
+        {
+            "score": chess.engine.PovScore(chess.engine.Cp(0), chess.WHITE),
+            "pv": [chess.Move.from_uci("e2e4")],
+            "depth": 1,
+        }
+    ]
+    assert engine.play(chess.Board()).uci() == "e2e4"
+    assert engine._engine.analyse.call_args.kwargs["multipv"] == 12
