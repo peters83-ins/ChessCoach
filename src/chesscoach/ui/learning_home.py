@@ -19,9 +19,12 @@ class LearningHomeDialog(QDialog):
         catalog: CourseCatalog,
         database: GameDatabase,
         parent: QWidget | None = None,
+        *,
+        profile_id: str = "default",
     ) -> None:
         super().__init__(parent)
         self.repository, self.catalog, self.database = repository, catalog, database
+        self.profile_id = profile_id
         self.setWindowTitle("Learn")
         self.resize(560, 430)
         layout = QVBoxLayout(self)
@@ -55,11 +58,11 @@ class LearningHomeDialog(QDialog):
         self.refresh()
 
     def refresh(self) -> None:
-        practice = self.repository.practice_progress()
-        due_courses = self.repository.due_course_mastery()
-        progress = self.repository.course_progress()
+        practice = self.repository.practice_progress(self.profile_id)
+        due_courses = self.repository.due_course_mastery(profile_id=self.profile_id)
+        progress = self.repository.course_progress(profile_id=self.profile_id)
         games = self.database.list_games()
-        weaknesses = self.repository.weakness_details()
+        weaknesses = self.repository.weakness_details(self.profile_id)
         course_available = bool(self.catalog.courses)
         self.next_action_key = "courses"
         self.continue_course.setEnabled(course_available)
@@ -128,12 +131,12 @@ class LearningHomeDialog(QDialog):
 
     def _choose(self, action: str) -> None:
         if action == "continue":
-            due = self.repository.due_course_mastery()
+            due = self.repository.due_course_mastery(profile_id=self.profile_id)
             if due:
                 self.action_requested.emit(f"course:{due[0].course_id}:{due[0].exercise_id}")
                 self.accept()
                 return
-            progress = self.repository.course_progress()
+            progress = self.repository.course_progress(profile_id=self.profile_id)
             if progress:
                 self.action_requested.emit(f"course:{progress[0].course_id}")
             elif self.catalog.courses:

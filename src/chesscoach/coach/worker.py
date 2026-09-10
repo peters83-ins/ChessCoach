@@ -39,6 +39,7 @@ class CoachWorker(QThread):
         repository: CoachRepository,
         settings: Settings,
         profile: AnalysisProfile,
+        profile_id: str = "default",
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -48,6 +49,7 @@ class CoachWorker(QThread):
         self.repository = repository
         self.settings = settings
         self.profile = profile
+        self.profile_id = profile_id
         self.cancelled = Event()
 
     def cancel(self) -> None:
@@ -79,7 +81,9 @@ class CoachWorker(QThread):
                 client = create_client(self.settings)
                 cloud = OpenAIProvider(cast(ResponsesClient, client), self.settings.openai_model)
             update(AnalysisProgress(last.total, last.total, "feedback", last.cached))
-            bundle = CoachPipeline(self.repository).build(self.data, analysis, cloud)
+            bundle = CoachPipeline(self.repository, self.profile_id).build(
+                self.data, analysis, cloud
+            )
             if not self.cancelled.is_set():
                 self.repository.update_run(run_id, "complete", last.total, last.total)
                 self.result.emit(self.generation, bundle)
@@ -118,6 +122,7 @@ class CoachRunner(QObject):
         repository: CoachRepository,
         settings: Settings | None = None,
         profile: AnalysisProfile | None = None,
+        profile_id: str = "default",
     ) -> None:
         self.cancel()
         self.last_error = ""
@@ -129,6 +134,7 @@ class CoachRunner(QObject):
             repository,
             settings or Settings.from_environment(Path(".env")),
             profile or AnalysisProfile(),
+            profile_id,
             self,
         )
         worker.progress.connect(self._progress)

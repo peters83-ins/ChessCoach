@@ -317,10 +317,12 @@ class LessonsDialog(QDialog):
         lessons: tuple[Lesson, ...],
         repository: CoachRepository,
         parent: QWidget | None = None,
+        *,
+        profile_id: str = "default",
     ) -> None:
         super().__init__(parent)
         self.lessons = lessons
-        self.repository = repository
+        self.repository, self.profile_id = repository, profile_id
         self.completed_ids = {lesson.id for lesson in lessons if lesson.completed}
         self.step = 0
         self.setWindowTitle("Personalized Lessons")
@@ -412,7 +414,7 @@ class LessonsDialog(QDialog):
         if not 0 <= index < len(self.lessons):
             return
         lesson = self.lessons[index]
-        items = {item.id: item for item in self.repository.practice_items()}
+        items = {item.id: item for item in self.repository.practice_items(self.profile_id)}
         item = next((items[item_id] for item_id in lesson.exercise_ids if item_id in items), None)
         if item is not None:
             PracticeDialog(item, self.repository, self).exec()

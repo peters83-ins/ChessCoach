@@ -28,9 +28,15 @@ from chesscoach.storage.coach import CoachRepository
 class WeaknessDashboardDialog(QDialog):
     example_requested = Signal(str, int)
 
-    def __init__(self, repository: CoachRepository, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        repository: CoachRepository,
+        parent: QWidget | None = None,
+        *,
+        profile_id: str = "default",
+    ) -> None:
         super().__init__(parent)
-        self.repository = repository
+        self.repository, self.profile_id = repository, profile_id
         self.setWindowTitle("Weakness Dashboard")
         self.resize(780, 440)
         layout = QVBoxLayout(self)
@@ -62,7 +68,7 @@ class WeaknessDashboardDialog(QDialog):
         self.refresh()
 
     def refresh(self) -> None:
-        details = self.repository.weakness_details()
+        details = self.repository.weakness_details(self.profile_id)
         self.table.setRowCount(len(details))
         for row, detail in enumerate(details):
             example = detail.examples[0] if detail.examples else ("", 0)
@@ -104,7 +110,9 @@ class WeaknessDashboardDialog(QDialog):
             QMessageBox.StandardButton.Cancel,
         )
         if answer == QMessageBox.StandardButton.Yes:
-            self.repository.dismiss_weakness(str(item.data(Qt.ItemDataRole.UserRole)))
+            self.repository.dismiss_weakness(
+                str(item.data(Qt.ItemDataRole.UserRole)), self.profile_id
+            )
             self.refresh()
 
 
@@ -116,9 +124,10 @@ class PracticeQueueDialog(QDialog):
         catalog: CourseCatalog | None = None,
         *,
         initial_theme: str | None = None,
+        profile_id: str = "default",
     ) -> None:
         super().__init__(parent)
-        self.repository = repository
+        self.repository, self.profile_id = repository, profile_id
         self.catalog = catalog or CourseCatalog()
         self.initial_theme = initial_theme
         self._personal: tuple[PracticeItem, ...] = ()
@@ -171,10 +180,12 @@ class PracticeQueueDialog(QDialog):
     def refresh(self) -> None:
         now = datetime.now(UTC).isoformat()
         self._personal = tuple(
-            item for item in self.repository.practice_items() if item.due_at <= now
+            item
+            for item in self.repository.practice_items(self.profile_id)
+            if item.due_at <= now
         )
         self._personal_by_id = {item.id: item for item in self._personal}
-        course_mastery = self.repository.due_course_mastery()
+        course_mastery = self.repository.due_course_mastery(profile_id=self.profile_id)
         self._course_by_id = {}
         course_items: list[LearningItem] = []
         for mastery in course_mastery:
@@ -195,7 +206,7 @@ class PracticeQueueDialog(QDialog):
             )
         concepts = tuple(
             LearningItem("concept", f"theme:{detail.theme}", detail.theme)
-            for detail in self.repository.weakness_details()
+            for detail in self.repository.weakness_details(self.profile_id)
         )
         personal_items = tuple(
             LearningItem("personal", item.id, item.theme) for item in self._personal
@@ -215,10 +226,10 @@ class PracticeQueueDialog(QDialog):
         self._apply_filters()
 
     def _apply_filters(self) -> None:
-        progress = self.repository.practice_progress()
+        progress = self.repository.practice_progress(self.profile_id)
         theme = str(self.theme_filter.currentData())
         failed = (
-            self.repository.previously_failed_practice_ids()
+            self.repository.previously_failed_practice_ids(self.profile_id)
             if self.failed_filter.isChecked()
             else frozenset()
         )

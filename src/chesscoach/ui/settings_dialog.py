@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from chesscoach.ai.client import test_connection
 from chesscoach.config import Settings, apply_process_settings, save_local_settings
 from chesscoach.preferences import UserPreferences
+from chesscoach.storage.coach import CoachRepository
 
 
 class ConnectionWorker(QThread):
@@ -51,6 +52,7 @@ class SettingsDialog(QDialog):
         env_path: Path = Path(".env"),
         preferences: UserPreferences | None = None,
         preference_settings: QSettings | None = None,
+        repository: CoachRepository | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -84,6 +86,15 @@ class SettingsDialog(QDialog):
         form.addRow("OpenAI model", self.model)
         layout.addLayout(form)
         preference_form = QFormLayout()
+        self.profile = QComboBox()
+        profiles = repository.profiles() if repository is not None else ()
+        if not profiles:
+            self.profile.addItem("Local player", "default")
+        else:
+            for profile in profiles:
+                self.profile.addItem(profile.name, profile.profile_id)
+        self._select_data(self.profile, self.preferences.profile_id)
+        preference_form.addRow("Learner profile", self.profile)
         self.orientation = QComboBox()
         self.orientation.addItem("Player side", "player")
         self.orientation.addItem("White", "white")
@@ -175,6 +186,7 @@ class SettingsDialog(QDialog):
 
     def current_preferences(self) -> UserPreferences:
         return UserPreferences(
+            profile_id=str(self.profile.currentData()),
             board_orientation=str(self.orientation.currentData()),
             board_theme=str(self.board_theme.currentData()),
             piece_scale=self.piece_scale.value(),
