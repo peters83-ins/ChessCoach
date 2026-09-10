@@ -15,6 +15,8 @@ def test_modern_theme_is_applied_to_primary_actions(app: QApplication, tmp_path:
     assert window.setup.start_button.objectName() == "primaryAction"
     assert not window.tools_group.isChecked()
     assert not window.load_button.isVisible()
+    assert window.play_action.isCheckable()
+    assert window.play_action.isChecked()
     assert "QScrollBar::handle:vertical" in MODERN_STYLESHEET
     assert "font-family" in MODERN_STYLESHEET
     window.close()

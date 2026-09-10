@@ -106,6 +106,8 @@ remain opt-in follow-up checks.
 
 The typed workspace navigator, bounded Back/Forward history, page reuse, and
 conservative Qt shutdown cleanup are implemented and covered by unit and stress tests.
+Primary destinations now use a compact vertical rail with exclusive active-state
+selection; Back and Forward remain separate keyboard-accessible actions.
 
 ### Stage 3 — Review and learning parity (complete)
 
