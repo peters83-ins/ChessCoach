@@ -192,9 +192,10 @@ selection; Back and Forward remain separate keyboard-accessible actions.
 
 **Branch:** `refactor/codebase-cleanup`
 
-Progress on this branch: course-attempt writes now use one SQLite transaction, and
-learning/review query paths have additive indexes in schema version 5. The full suite
-remains green at 213 tests; the broader inventory and dependency audit remains open.
+Progress on this branch: course-attempt writes now use one SQLite transaction, learning/review query paths
+have additive indexes in schema version 5, and coaching connections share one timeout
+and foreign-key configuration. The full suite remains green at 213 tests; the broader
+inventory and dependency audit remains open.
 
 - Inventory modules, public functions, signals, settings keys, database migrations,
   and UI actions; remove unreachable, duplicated, stale, and abandoned code only when

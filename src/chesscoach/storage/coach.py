@@ -117,9 +117,15 @@ class CoachRepository:
     def __init__(self, path: Path) -> None:
         self.path = path
 
+    def _connect(self) -> sqlite3.Connection:
+        """Open a consistently configured repository connection."""
+        connection = sqlite3.connect(self.path, timeout=3.0)
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
     def migrate(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with closing(sqlite3.connect(self.path, timeout=3.0)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_versions ("
                 "component TEXT PRIMARY KEY, version INTEGER NOT NULL)"
@@ -150,7 +156,7 @@ class CoachRepository:
 
     def profiles(self) -> tuple[PlayerProfile, ...]:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT id, name, created_at FROM player_profiles ORDER BY created_at, id"
             ).fetchall()
@@ -166,7 +172,7 @@ class CoachRepository:
             raise ValueError("Profile identifier is reserved or empty.")
         profile = PlayerProfile(identifier, clean_name, _now())
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             try:
                 connection.execute(
                     "INSERT INTO player_profiles(id, name, created_at) VALUES (?, ?, ?)",
@@ -181,7 +187,7 @@ class CoachRepository:
         if profile_id == DEFAULT_PROFILE_ID:
             raise ValueError("The default profile cannot be deleted.")
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             exists = connection.execute(
                 "SELECT 1 FROM player_profiles WHERE id=?", (profile_id,)
             ).fetchone()
@@ -346,7 +352,7 @@ class CoachRepository:
         self.migrate()
         run_id = str(uuid4())
         now = _now()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "INSERT INTO analysis_runs VALUES (?, ?, ?, ?, 'running', 0, 0, NULL, ?, ?)",
                 (run_id, game_id, _json(asdict(profile)), profile.engine_signature, now, now),
@@ -361,7 +367,7 @@ class CoachRepository:
         total: int,
         error: str | None = None,
     ) -> None:
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "UPDATE analysis_runs SET state=?, completed=?, total=?, error=?, "
                 "updated_at=? WHERE id=?",
@@ -373,7 +379,7 @@ class CoachRepository:
         if not self.path.is_file():
             return None
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT state, completed, total, COALESCE(error, '') FROM analysis_runs "
                 "WHERE game_id=? ORDER BY updated_at DESC LIMIT 1",
@@ -395,7 +401,7 @@ class CoachRepository:
         if game_id is not None:
             query += " AND game_id=?"
             parameters = (game_id,)
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(query, parameters).fetchall()
         counts: dict[str, int] = {}
         for row in rows:
@@ -412,7 +418,7 @@ class CoachRepository:
             return {}
         self.migrate()
         placeholders = ",".join("?" for _ in game_ids)
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             analyzed = {
                 str(row[0])
                 for row in connection.execute(
@@ -439,7 +445,7 @@ class CoachRepository:
         if not self.path.is_file():
             return
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             practice_ids = tuple(
                 str(row[0])
                 for row in connection.execute(
@@ -469,7 +475,7 @@ class CoachRepository:
             connection.execute("DELETE FROM analysis_runs WHERE game_id=?", (game_id,))
 
     def save_analysis(self, run_id: str, analysis: GameAnalysis) -> None:
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("DELETE FROM move_analyses WHERE run_id=?", (run_id,))
             connection.executemany(
@@ -493,7 +499,7 @@ class CoachRepository:
         if not self.path.is_file():
             return None
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT id, profile_json FROM analysis_runs WHERE game_id=? AND state='complete' "
                 "ORDER BY updated_at DESC LIMIT 1",
@@ -519,7 +525,7 @@ class CoachRepository:
         )
 
     def _game_player_color(self, game_id: str) -> str:
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT player_color FROM games WHERE id=?", (game_id,)
             ).fetchone()
@@ -538,7 +544,7 @@ class CoachRepository:
         if game_id is not None:
             query += " AND ar.game_id=?"
             params = (game_id,)
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(query, params).fetchall()
         return tuple(_move_from_dict(json.loads(row[0])) for row in rows)
 
@@ -547,7 +553,7 @@ class CoachRepository:
         if not self.path.is_file():
             return ()
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT ar.game_id, ma.data_json FROM move_analyses ma "
                 "JOIN analysis_runs ar ON ar.id=ma.run_id WHERE ar.state='complete'"
@@ -557,7 +563,7 @@ class CoachRepository:
     def get_move_analysis(self, key: str) -> MoveAnalysis | None:
         if not self.path.is_file():
             return None
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             try:
                 row = connection.execute(
                     "SELECT data_json FROM analysis_cache WHERE cache_key=?", (key,)
@@ -568,7 +574,7 @@ class CoachRepository:
 
     def put_move_analysis(self, key: str, analysis: MoveAnalysis) -> None:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "INSERT INTO analysis_cache VALUES (?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET "
                 "data_json=excluded.data_json, updated_at=excluded.updated_at",
@@ -579,7 +585,7 @@ class CoachRepository:
         if not feedback:
             return
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.executemany(
                 "INSERT INTO coach_feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT DO UPDATE SET "
@@ -602,7 +608,7 @@ class CoachRepository:
     def load_feedback(self, game_id: str) -> tuple[CoachFeedback, ...]:
         if not self.path.is_file():
             return ()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             try:
                 rows = connection.execute(
                     "SELECT data_json FROM coach_feedback WHERE game_id=? ORDER BY ply", (game_id,)
@@ -627,7 +633,7 @@ class CoachRepository:
         lessons: tuple[Lesson, ...],
     ) -> None:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.executemany(
                 "INSERT INTO weakness_events(profile_id, game_id, ply, theme, severity, "
                 "confidence, "
@@ -672,7 +678,7 @@ class CoachRepository:
 
     def weakness_scores(self, profile_id: str = DEFAULT_PROFILE_ID) -> tuple[WeaknessScore, ...]:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT game_id, ply, theme, severity, confidence, outcome, created_at "
                 "FROM weakness_events WHERE profile_id=? AND theme NOT IN "
@@ -693,7 +699,7 @@ class CoachRepository:
         scores = {item.theme: item for item in self.weakness_scores(profile_id)}
         if not scores:
             return ()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT game_id, ply, theme, confidence, created_at FROM weakness_events "
                 "WHERE profile_id=? AND outcome='observed' ORDER BY created_at DESC",
@@ -745,7 +751,7 @@ class CoachRepository:
 
     def dismiss_weakness(self, theme: str, profile_id: str = DEFAULT_PROFILE_ID) -> None:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "INSERT OR REPLACE INTO dismissed_weaknesses VALUES (?, ?, ?)",
                 (profile_id, theme, _now()),
@@ -753,7 +759,7 @@ class CoachRepository:
 
     def practice_items(self, profile_id: str = DEFAULT_PROFILE_ID) -> tuple[PracticeItem, ...]:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT data_json FROM practice_items WHERE profile_id=? ORDER BY due_at",
                 (profile_id,),
@@ -775,7 +781,7 @@ class CoachRepository:
     def practice_progress(self, profile_id: str = DEFAULT_PROFILE_ID) -> PracticeProgress:
         self.migrate()
         now = _now()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             total, due = connection.execute(
                 "SELECT COUNT(*), SUM(CASE WHEN due_at<=? THEN 1 ELSE 0 END) "
                 "FROM practice_items WHERE profile_id=?",
@@ -793,7 +799,7 @@ class CoachRepository:
     ) -> frozenset[str]:
         """Return practice items with at least one unsuccessful attempt."""
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT DISTINCT item_id FROM practice_attempts "
                 "WHERE successful=0 AND item_id IN "
@@ -807,7 +813,7 @@ class CoachRepository:
     ) -> dict[str, tuple[tuple[bool, ...], tuple[bool, ...]]]:
         """Group failed and successful practice attempts by theme."""
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT p.theme, a.successful FROM practice_attempts a "
                 "JOIN practice_items p ON p.id=a.item_id WHERE p.profile_id=? "
@@ -822,7 +828,7 @@ class CoachRepository:
 
     def lessons(self, profile_id: str = DEFAULT_PROFILE_ID) -> tuple[Lesson, ...]:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT lessons.data_json, COALESCE(lesson_progress.completed, 0) "
                 "FROM lessons LEFT JOIN lesson_progress ON lesson_progress.lesson_id=lessons.id "
@@ -846,7 +852,7 @@ class CoachRepository:
         self, item: PracticeItem, move_uci: str, successful: bool
     ) -> PracticeItem:
         updated = schedule_attempt(item, successful=successful)
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "INSERT INTO practice_attempts(item_id, attempted_at, move_uci, successful) "
                 "VALUES (?, ?, ?, ?)",
@@ -874,7 +880,7 @@ class CoachRepository:
 
     def lesson_step(self, lesson_id: str) -> int:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT step FROM lesson_progress WHERE lesson_id=?", (lesson_id,)
             ).fetchone()
@@ -884,7 +890,7 @@ class CoachRepository:
         self, lesson_id: str, completed: bool = True, *, step: int = 0
     ) -> None:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "INSERT INTO lesson_progress(lesson_id, completed, updated_at, step) "
                 "VALUES (?, ?, ?, ?) ON CONFLICT(lesson_id) DO UPDATE SET "
@@ -897,7 +903,7 @@ class CoachRepository:
         self.migrate()
         first_module = course.modules[0].id if course.modules else ""
         now = _now()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "INSERT INTO course_progress(profile_id, course_id, content_version, "
                 "last_module_id, "
@@ -936,7 +942,7 @@ class CoachRepository:
         if course_id is not None:
             query += " AND course_id=?"
             params += (course_id,)
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(query, params).fetchall()
         return tuple(
             CourseProgress(
@@ -954,7 +960,7 @@ class CoachRepository:
         profile_id: str = DEFAULT_PROFILE_ID,
     ) -> None:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 "UPDATE course_progress SET last_module_id=?, completed=?, updated_at=? "
                 "WHERE profile_id=? AND course_id=?",
@@ -965,7 +971,7 @@ class CoachRepository:
         self, course_id: str, profile_id: str = DEFAULT_PROFILE_ID
     ) -> tuple[MoveMastery, ...]:
         self.migrate()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT profile_id, course_id, exercise_id, decision_index, level, due_at, "
                 "attempts, "
@@ -980,7 +986,7 @@ class CoachRepository:
     ) -> tuple[MoveMastery, ...]:
         self.migrate()
         cutoff = now or _now()
-        with closing(sqlite3.connect(self.path)) as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 "SELECT profile_id, course_id, exercise_id, decision_index, level, due_at, "
                 "attempts, "
@@ -1004,7 +1010,7 @@ class CoachRepository:
         self.migrate()
         now = datetime.now(UTC)
         current_level = 0
-        with closing(sqlite3.connect(self.path)) as connection, connection:
+        with closing(self._connect()) as connection, connection:
             existing = connection.execute(
                 "SELECT level FROM course_mastery WHERE profile_id=? AND course_id=? "
                 "AND exercise_id=? AND decision_index=?",
