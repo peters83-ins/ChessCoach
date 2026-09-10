@@ -7,7 +7,7 @@ from pathlib import Path
 
 import chess
 from PySide6.QtCore import QSettings, QStandardPaths, Qt, QTimer
-from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -129,8 +129,9 @@ class MainWindow(QMainWindow):
         self.resize(1050, 740)
         navigation = QToolBar("Navigation", self)
         navigation.setMovable(False)
+        navigation.setOrientation(Qt.Orientation.Vertical)
         navigation.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        self.addToolBar(navigation)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, navigation)
         self.play_action = QAction("Play", self)
         self.games_action = QAction("Games", self)
         self.review_action = QAction("Review", self)
@@ -156,6 +157,8 @@ class MainWindow(QMainWindow):
         self.learn_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
         self.insights_action.setShortcut(QKeySequence("Ctrl+I"))
         self.settings_action.setShortcut(QKeySequence.StandardKey.Preferences)
+        navigation_group = QActionGroup(self)
+        navigation_group.setExclusive(True)
         for action in (
             self.play_action,
             self.games_action,
@@ -166,10 +169,13 @@ class MainWindow(QMainWindow):
             self.learn_action,
             self.insights_action,
             self.settings_action,
-            self.back_action,
-            self.forward_action,
         ):
+            action.setCheckable(True)
+            navigation_group.addAction(action)
             navigation.addAction(action)
+        navigation.addAction(self.back_action)
+        navigation.addAction(self.forward_action)
+        self.play_action.setChecked(True)
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
