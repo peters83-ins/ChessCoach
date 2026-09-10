@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import chess
-from PySide6.QtCore import QSettings, QStandardPaths, Qt, QTimer
+from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -36,6 +36,7 @@ from chesscoach.coach.scoring import pov_score
 from chesscoach.coach.worker import CoachRunner
 from chesscoach.config import Settings
 from chesscoach.courses.catalog import CourseCatalog
+from chesscoach.distribution import runtime_paths
 from chesscoach.engine.analysis import PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
 from chesscoach.preferences import UserPreferences
@@ -107,9 +108,7 @@ class MainWindow(QMainWindow):
         self.runner = runner if runner is not None else EngineRunner(self)
         self.runner.result.connect(self.engine_result)
         self.runner.error.connect(self.engine_error)
-        data_dir = Path(
-            QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
-        )
+        data_dir = runtime_paths().data_dir
         self.database = database or GameDatabase(
             data_dir / "games" / "games.sqlite3",
             legacy_path=data_dir / "games.sqlite3",
@@ -293,6 +292,7 @@ class MainWindow(QMainWindow):
         for button in tool_buttons:
             tools_layout.addWidget(button)
             button.setVisible(False)
+
         def toggle_tools(visible: bool) -> None:
             for button in tool_buttons:
                 button.setVisible(visible)
@@ -731,9 +731,7 @@ class MainWindow(QMainWindow):
             lambda: self._make_saved_games_dialog(games),
         )
 
-    def _make_saved_games_dialog(
-        self, games: tuple[SavedGameSummary, ...]
-    ) -> SavedGamesDialog:
+    def _make_saved_games_dialog(self, games: tuple[SavedGameSummary, ...]) -> SavedGamesDialog:
         dialog = SavedGamesDialog(
             games,
             str(self.database.path),
@@ -838,9 +836,9 @@ class MainWindow(QMainWindow):
         self.active = False
         self.review = review
         self.review_cache.clear()
-        self.coach_bundle = CoachPipeline(
-            self.coach_repository, self.preferences.profile_id
-        ).load(data)
+        self.coach_bundle = CoachPipeline(self.coach_repository, self.preferences.profile_id).load(
+            data
+        )
         self.coach_panel.clear()
         self.coach_panel.set_game_context(data.moves)
         self.review_details = (

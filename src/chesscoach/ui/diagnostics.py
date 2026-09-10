@@ -15,11 +15,13 @@ class DiagnosticInfo:
     ai_ready: bool
     last_error: str = ""
     analysis_state: str = "idle"
+    install_mode: str = "installed"
 
     def render(self, secret: str = "") -> str:
         error = self.last_error.replace(secret, "[redacted]") if secret else self.last_error
         return (
             f"Chess Coach {self.app_version}\n"
+            f"Install mode: {self.install_mode}\n"
             f"Database: {self.database_path}\n"
             f"Stockfish path: {self.engine_path or 'Not configured'}\n"
             f"Stockfish version: {self.engine_version or 'Not detected yet'}\n"
