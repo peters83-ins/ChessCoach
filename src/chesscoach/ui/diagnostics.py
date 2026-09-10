@@ -14,6 +14,7 @@ class DiagnosticInfo:
     engine_version: str
     ai_ready: bool
     last_error: str = ""
+    analysis_state: str = "idle"
 
     def render(self, secret: str = "") -> str:
         error = self.last_error.replace(secret, "[redacted]") if secret else self.last_error
@@ -23,6 +24,7 @@ class DiagnosticInfo:
             f"Stockfish path: {self.engine_path or 'Not configured'}\n"
             f"Stockfish version: {self.engine_version or 'Not detected yet'}\n"
             f"OpenAI: {'Ready' if self.ai_ready else 'Not configured; local coach active'}\n"
+            f"Analysis state: {self.analysis_state}\n"
             f"Last error: {error or 'None'}"
         )
 

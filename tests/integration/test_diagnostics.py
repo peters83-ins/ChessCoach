@@ -16,5 +16,6 @@ def test_diagnostics_are_copyable_and_secret_free(app: QApplication) -> None:
     dialog = DiagnosticsDialog(info, secret=secret)
     assert secret not in dialog.text.text()
     assert "Stockfish 17" in dialog.text.text()
+    assert "Analysis state:" in dialog.text.text()
     dialog.copy()
     assert app.clipboard().text() == dialog.text.text()

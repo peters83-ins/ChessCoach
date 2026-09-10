@@ -1,5 +1,6 @@
 """Qt orchestration for cancellable full-game coaching jobs."""
 
+from enum import StrEnum
 from pathlib import Path
 from threading import Event
 from typing import cast
@@ -14,6 +15,15 @@ from chesscoach.coach.service import AnalysisCancelled, GameAnalysisService
 from chesscoach.config import Settings
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameData
+
+
+class CoachWorkerState(StrEnum):
+    IDLE = "idle"
+    ANALYZING = "analyzing"
+    READY = "ready"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+    CLOSED = "closed"
 
 
 class CoachWorker(QThread):
@@ -98,6 +108,8 @@ class CoachRunner(QObject):
         super().__init__(parent)
         self.generation = 0
         self.workers: list[CoachWorker] = []
+        self.state = CoachWorkerState.IDLE
+        self.last_error = ""
 
     def start(
         self,
@@ -108,6 +120,8 @@ class CoachRunner(QObject):
         profile: AnalysisProfile | None = None,
     ) -> None:
         self.cancel()
+        self.last_error = ""
+        self.state = CoachWorkerState.ANALYZING
         worker = CoachWorker(
             self.generation,
             data,
@@ -132,11 +146,14 @@ class CoachRunner(QObject):
     @Slot(int, object)
     def _result(self, generation: int, bundle: CoachBundle) -> None:
         if generation == self.generation:
+            self.state = CoachWorkerState.READY
             self.result.emit(bundle)
 
     @Slot(int, str)
     def _error(self, generation: int, message: str) -> None:
         if generation == self.generation:
+            self.state = CoachWorkerState.FAILED
+            self.last_error = message
             self.error.emit(message)
 
     @Slot()
@@ -148,6 +165,8 @@ class CoachRunner(QObject):
 
     def cancel(self) -> None:
         self.generation += 1
+        if self.workers:
+            self.state = CoachWorkerState.CANCELLED
         for worker in self.workers:
             worker.cancel()
 
@@ -155,3 +174,4 @@ class CoachRunner(QObject):
         self.cancel()
         for worker in self.workers:
             worker.wait()
+        self.state = CoachWorkerState.CLOSED
