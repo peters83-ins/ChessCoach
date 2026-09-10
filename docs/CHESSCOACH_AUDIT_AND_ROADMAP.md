@@ -13,6 +13,9 @@ regression scope; the staged backlog below is the active queue.
 - OpenAI is an optional explanation layer and must only receive verified facts.
 - Baseline validation: 186 passed, 8 skipped on the Windows Python module test run.
 - Real-Stockfish tests are opt-in through `CHESSCOACH_TEST_STOCKFISH`.
+- Stage 0 audit harness now covers every primary destination and the visible
+  non-destructive controls in three repeated offscreen passes. The current full
+  run is 190 passed, 8 skipped, with aggregate coverage still at 88%.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
   practice links, related-course links, Stage 3 direct learning routing, Stage 4
@@ -73,12 +76,18 @@ visual identity, reviewed offline content, and local-first data model.
 
 ### Stage 1 — Reliability and engine confidence
 
+Stage 0 baseline work is complete on `audit/baseline-harness`; the remaining items
+below are the next reliability implementation stage.
+
 - Add worker timeout and cancellation interaction coverage; malformed output and
   startup-process crashes now have deterministic regression coverage.
 - Add install → play → save → load → analyze → retry → reopen tests.
 - Stress stale generation/FEN checks and delayed bot cancellation.
 - Run the opt-in real-Stockfish matrix for 800, 1000, 1200, and full strength.
 - Show engine version, active profile, last failure, and analysis state in diagnostics.
+
+The audit harness emits structured `AuditReport`/`AuditFinding` JSON so each future
+stress run can be attached to the finding table without relying on console prose.
 
 ### Stage 2 — Shared navigation shell
 
