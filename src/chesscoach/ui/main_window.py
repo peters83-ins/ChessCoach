@@ -54,6 +54,7 @@ from chesscoach.ui.learning_center import PracticeQueueDialog, WeaknessDashboard
 from chesscoach.ui.learning_home import LearningHomeDialog
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import BADGES, MoveHistory
+from chesscoach.ui.navigation import Destination, WorkspaceNavigator
 from chesscoach.ui.sandbox import AnalysisSandboxDialog
 from chesscoach.ui.saved_games import SavedGamesDialog
 from chesscoach.ui.settings_dialog import SettingsDialog
@@ -122,7 +123,7 @@ class MainWindow(QMainWindow):
         self.preferences = UserPreferences.load(self.preference_settings)
         self.course_catalog = course_catalog or CourseCatalog.built_in()
         self.first_run_wizard: FirstRunWizard | None = None
-        self.destination_dialogs: dict[str, QDialog] = {}
+        self.destination_dialogs: dict[str, QWidget] = {}
         self.setWindowTitle("Chess Coach")
         self.resize(1050, 740)
         navigation = QToolBar("Navigation", self)
@@ -143,6 +144,8 @@ class MainWindow(QMainWindow):
         self.settings_action = QAction("Settings", self)
         self.back_action = QAction("Back", self)
         self.back_action.setShortcut(QKeySequence("Alt+Left"))
+        self.forward_action = QAction("Forward", self)
+        self.forward_action.setShortcut(QKeySequence("Alt+Right"))
         self.play_action.setShortcut(QKeySequence.StandardKey.New)
         self.games_action.setShortcut(QKeySequence.StandardKey.Open)
         self.review_action.setShortcut(QKeySequence("Ctrl+R"))
@@ -163,6 +166,7 @@ class MainWindow(QMainWindow):
             self.insights_action,
             self.settings_action,
             self.back_action,
+            self.forward_action,
         ):
             navigation.addAction(action)
         central = QWidget()
@@ -187,6 +191,8 @@ class MainWindow(QMainWindow):
         sidebar_scroll.setWidget(sidebar_container)
         self.workspace_stack = QStackedWidget()
         self.workspace_stack.addWidget(sidebar_scroll)
+        self.navigator = WorkspaceNavigator(self.workspace_stack)
+        self.navigator.set_initial(Destination.PLAY)
         layout.addWidget(self.workspace_stack, 1)
         title = QLabel("Chess Coach")
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
@@ -297,7 +303,8 @@ class MainWindow(QMainWindow):
         self.learn_action.triggered.connect(self.open_learning_home)
         self.insights_action.triggered.connect(self.open_insights)
         self.settings_action.triggered.connect(self.open_settings)
-        self.back_action.triggered.connect(self.show_play_workspace)
+        self.back_action.triggered.connect(self.navigate_back)
+        self.forward_action.triggered.connect(self.navigate_forward)
         self.apply_preferences(self.preferences)
         self.refresh()
 
@@ -1145,8 +1152,19 @@ class MainWindow(QMainWindow):
         )
 
     def show_play_workspace(self) -> None:
+        self.navigator.set_initial(Destination.PLAY)
         self.workspace_stack.setCurrentIndex(0)
         self.statusBar().showMessage("Play workspace", 2000)
+
+    def navigate_back(self) -> None:
+        destination = self.navigator.back()
+        if destination is None or destination == Destination.PLAY:
+            self.show_play_workspace()
+
+    def navigate_forward(self) -> None:
+        destination = self.navigator.forward()
+        if destination is None or destination == Destination.PLAY.value:
+            self.show_play_workspace()
 
     def open_lessons(self) -> None:
         lessons = self.coach_repository.lessons()
@@ -1206,21 +1224,12 @@ class MainWindow(QMainWindow):
         return dialog
 
     def _show_destination(self, key: str, factory: Callable[[], QDialog]) -> None:
-        existing = self.destination_dialogs.get(key)
-        if existing is not None:
-            existing.show()
-            existing.raise_()
-            existing.activateWindow()
-            return
-        dialog = factory()
-        self.destination_dialogs[key] = dialog
-        dialog.setParent(self.workspace_stack)
-        dialog.setWindowFlags(Qt.WindowType.Widget)
-        self.workspace_stack.addWidget(dialog)
-        self.workspace_stack.setCurrentWidget(dialog)
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+        try:
+            destination: Destination | str = Destination(key)
+        except ValueError:
+            destination = key
+        page = self.navigator.show(destination, factory)
+        self.destination_dialogs[key] = page
 
     def _learning_action(self, action: str) -> None:
         if action == "practice":
@@ -1332,8 +1341,7 @@ class MainWindow(QMainWindow):
         if not self.save_match():
             event.ignore()
             return
-        for dialog in tuple(self.destination_dialogs.values()):
-            dialog.close()
+        self.navigator.clear()
         self.destination_dialogs.clear()
         self.cancel_pending_bot()
         self.runner.shutdown()
