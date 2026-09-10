@@ -32,4 +32,5 @@ def test_evaluation_graph_supports_keyboard_navigation(app: QApplication) -> Non
     assert selected == [2, 0, 3]
     assert graph.focusPolicy().name == "StrongFocus"
     assert "Left and Right" in graph.accessibleDescription()
+    assert "diamond" in graph.accessibleDescription()
     graph.close()

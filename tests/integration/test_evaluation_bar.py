@@ -24,6 +24,7 @@ def test_evaluation_bar_score_result_and_orientation(app: QApplication) -> None:
     assert bar.white_fraction > 0.5
     assert bar.display_text == "+2.5"
     assert "+2.5" in bar.accessibleName()
+    assert "White share" in bar.accessibleDescription()
     bar.resize(34, 200)
     bar.show()
     app.processEvents()

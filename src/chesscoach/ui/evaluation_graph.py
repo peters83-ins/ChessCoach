@@ -20,7 +20,8 @@ class EvaluationGraph(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAccessibleName("Whole-game evaluation graph")
         self.setAccessibleDescription(
-            "Use Left and Right to move through plies. Home and End jump to the game boundaries."
+            "Use Left and Right to move through plies. Home and End jump to the game boundaries. "
+            "Red diamond markers identify critical moves."
         )
         self.setToolTip("Click the graph to jump to a move. Higher positions favor White.")
 
@@ -86,8 +87,18 @@ class EvaluationGraph(QWidget):
         for index in self.critical:
             if 0 < index < len(points):
                 painter.setBrush(QColor("#c83f49"))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawEllipse(points[index], 4, 4)
+                painter.setPen(QPen(QColor("#7f1d2d"), 1))
+                point = points[index]
+                painter.drawPolygon(
+                    QPolygonF(
+                        (
+                            QPointF(point.x(), point.y() - 5),
+                            QPointF(point.x() + 5, point.y()),
+                            QPointF(point.x(), point.y() + 5),
+                            QPointF(point.x() - 5, point.y()),
+                        )
+                    )
+                )
         selected = points[self.selected]
         painter.setBrush(QColor("#7b2f8e"))
         painter.setPen(QPen(QColor("#ffffff"), 1))

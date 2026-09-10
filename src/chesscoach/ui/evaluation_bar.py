@@ -64,6 +64,9 @@ class EvaluationBar(QWidget):
 
     def _update_accessibility(self) -> None:
         self.setAccessibleName(f"Board evaluation: {self.display_text}")
+        self.setAccessibleDescription(
+            "White share of the current Stockfish evaluation; the dark section favors Black."
+        )
 
     def paintEvent(self, event: QPaintEvent) -> None:
         del event
