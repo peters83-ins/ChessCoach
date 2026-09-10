@@ -42,9 +42,12 @@ class InsightsDialog(QDialog):
         database: GameDatabase,
         catalog: CourseCatalog | None = None,
         parent: QWidget | None = None,
+        *,
+        profile_id: str = "default",
     ) -> None:
         super().__init__(parent)
         self.repository, self.database = repository, database
+        self.profile_id = profile_id
         self.catalog = catalog or CourseCatalog()
         self.setWindowTitle("Learning Insights")
         self.resize(700, 500)
@@ -114,7 +117,7 @@ class InsightsDialog(QDialog):
                 (stat.opening, str(stat.games), str(stat.wins), str(stat.losses))
             ):
                 self.openings.setItem(row, column, QTableWidgetItem(value))
-        details = self.repository.weakness_details()
+        details = self.repository.weakness_details(self.profile_id)
         self._theme_examples = {detail.theme: detail.examples for detail in details}
         analyzed = self.repository.stored_move_analyses()
         frequencies = analyzed_theme_counts(analyzed)
@@ -186,11 +189,15 @@ class InsightsDialog(QDialog):
                 "recognized games."
             )
         )
-        due = len(self.repository.due_course_mastery()) + self.repository.practice_progress().due
+        due = len(self.repository.due_course_mastery(profile_id=self.profile_id)) + (
+            self.repository.practice_progress(self.profile_id).due
+        )
         theme = details[0].theme if details else ""
         self.mastery.setValue(self._mastery_percent())
         transfer_rows = []
-        for theme_name, (before, after) in self.repository.practice_transfer_observations().items():
+        for theme_name, (before, after) in self.repository.practice_transfer_observations(
+            profile_id=self.profile_id
+        ).items():
             metric = transfer_metric(theme_name, before, after)
             if metric is not None:
                 transfer_rows.append(
@@ -282,7 +289,7 @@ class InsightsDialog(QDialog):
         mastery = [
             item
             for course in self.catalog.courses
-            for item in self.repository.course_mastery(course.id)
+            for item in self.repository.course_mastery(course.id, self.profile_id)
         ]
         if not mastery:
             return 0

@@ -131,9 +131,11 @@ class CourseDetailDialog(QDialog):
         parent: QWidget | None = None,
         *,
         start_exercise_id: str | None = None,
+        profile_id: str = "default",
     ) -> None:
         super().__init__(parent)
         self.course, self.repository = course, repository
+        self.profile_id = profile_id
         self.start_exercise_id = start_exercise_id
         self.setWindowTitle(course.title)
         layout = QVBoxLayout(self)
@@ -165,11 +167,13 @@ class CourseDetailDialog(QDialog):
         self.update_progress()
 
     def update_progress(self) -> None:
-        progress = self.repository.course_progress(self.course.id)
+        progress = self.repository.course_progress(self.course.id, self.profile_id)
         self.progress.setText(
             "Enrolled — continue where you left off." if progress else "Not started"
         )
-        mastery = self.repository.course_mastery(self.course.id) if progress else ()
+        mastery = (
+            self.repository.course_mastery(self.course.id, self.profile_id) if progress else ()
+        )
         if mastery:
             mastered = sum(item.level > 0 for item in mastery)
             completed_exercises = sum(
@@ -190,8 +194,8 @@ class CourseDetailDialog(QDialog):
         self.start.setText("Continue" if progress else "Start")
 
     def start_course(self) -> None:
-        self.repository.enroll_course(self.course)
-        progress = self.repository.course_progress(self.course.id)
+        self.repository.enroll_course(self.course, self.profile_id)
+        progress = self.repository.course_progress(self.course.id, self.profile_id)
         module_id = progress[0].last_module_id if progress else ""
         start_index = next(
             (
@@ -208,7 +212,13 @@ class CourseDetailDialog(QDialog):
                 0,
             ),
         )
-        CoursePlayerDialog(self.course, self.repository, self, start_index=start_index).exec()
+        CoursePlayerDialog(
+            self.course,
+            self.repository,
+            self,
+            start_index=start_index,
+            profile_id=self.profile_id,
+        ).exec()
         self.update_progress()
 
 
@@ -220,9 +230,11 @@ class CoursePlayerDialog(QDialog):
         parent: QWidget | None = None,
         *,
         start_index: int = 0,
+        profile_id: str = "default",
     ) -> None:
         super().__init__(parent)
         self.course, self.repository = course, repository
+        self.profile_id = profile_id
         self.exercise_index = max(0, min(start_index, len(course.exercises) - 1))
         self.hints_used = 0
         self.setWindowTitle(f"Learn: {course.title}")
@@ -264,7 +276,7 @@ class CoursePlayerDialog(QDialog):
         exercise = self.course.exercises[self.exercise_index]
         item = PracticeItem(
             id=f"course:{self.course.id}:{exercise.id}",
-            profile_id="default",
+            profile_id=self.profile_id,
             source_game_id="",
             source_ply=0,
             fen=exercise.fen,
@@ -331,7 +343,7 @@ class CoursePlayerDialog(QDialog):
         exercise = self.course.exercises[self.exercise_index]
         decisions = tuple(
             item
-            for item in self.repository.course_mastery(self.course.id)
+            for item in self.repository.course_mastery(self.course.id, self.profile_id)
             if item.exercise_id == exercise.id
         )
         current = next(

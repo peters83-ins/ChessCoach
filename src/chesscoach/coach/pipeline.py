@@ -19,8 +19,11 @@ from chesscoach.storage.database import GameData
 
 
 class CoachPipeline:
-    def __init__(self, repository: CoachRepository | None = None) -> None:
+    def __init__(
+        self, repository: CoachRepository | None = None, profile_id: str = DEFAULT_PROFILE_ID
+    ) -> None:
         self.repository = repository
+        self.profile_id = profile_id
 
     def build(
         self,
@@ -34,19 +37,19 @@ class CoachPipeline:
         feedback = self._cloud_enrichment(
             contexts, local, cloud_provider, data.player_color, stored
         )
-        events = weakness_events(DEFAULT_PROFILE_ID, data.id, analysis.moves, data.player_color)
+        events = weakness_events(self.profile_id, data.id, analysis.moves, data.player_color)
         current_practice = generate_practice_items(
-            DEFAULT_PROFILE_ID, data.id, analysis.moves, data.player_color
+            self.profile_id, data.id, analysis.moves, data.player_color
         )
         if self.repository:
             self.repository.save_feedback(feedback)
             self.repository.save_learning(events, current_practice, ())
-            weaknesses = self.repository.weakness_scores()
-            practice = self.repository.practice_items()
+            weaknesses = self.repository.weakness_scores(self.profile_id)
+            practice = self.repository.practice_items(self.profile_id)
         else:
             weaknesses = aggregate_weaknesses(events)
             practice = current_practice
-        lessons = generate_lessons(DEFAULT_PROFILE_ID, weaknesses, practice)
+        lessons = generate_lessons(self.profile_id, weaknesses, practice)
         if self.repository:
             self.repository.save_learning((), (), lessons)
         return CoachBundle(
@@ -64,9 +67,9 @@ class CoachPipeline:
         analysis = self.repository.load_latest_analysis(data.id)
         if analysis is None:
             return None
-        weaknesses = self.repository.weakness_scores()
-        practice = self.repository.practice_items()
-        lessons = self.repository.lessons()
+        weaknesses = self.repository.weakness_scores(self.profile_id)
+        practice = self.repository.practice_items(self.profile_id)
+        lessons = self.repository.lessons(self.profile_id)
         contexts = tuple(CoachingContext(data.id, move) for move in analysis.moves)
         stored = self.repository.load_feedback(data.id)
         feedback = []

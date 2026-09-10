@@ -11,11 +11,11 @@ regression scope; the staged backlog below is the active queue.
 - Python 3.12+, python-chess, Stockfish, PySide6, SQLite, and optional OpenAI feedback.
 - Stockfish and python-chess are authoritative for legality, evaluation, and tactics.
 - OpenAI is an optional explanation layer and must only receive verified facts.
-- Baseline validation: 186 passed, 8 skipped on the Windows Python module test run.
+- Baseline validation: 197 passed, 8 skipped on the Windows Python module test run.
 - Real-Stockfish tests are opt-in through `CHESSCOACH_TEST_STOCKFISH`.
 - Stage 0 audit harness now covers every primary destination and the visible
   non-destructive controls in three repeated offscreen passes. The current full
-  run is 195 passed, 8 skipped, with aggregate coverage still at 88%.
+  run is 197 passed, 8 skipped, with aggregate coverage still at 88%.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
   practice links, related-course links, Stage 3 direct learning routing, Stage 4
@@ -93,6 +93,9 @@ Engine and coaching runners now expose explicit idle/searching/ready/cancelled/f
 closed states and preserve the last worker error for diagnostics. The full lifecycle
 state contract is covered by focused tests; timeout and real-Stockfish matrix coverage
 remain opt-in follow-up checks.
+Settings now selects a persisted learner profile, and the selected profile flows through
+coaching records, practice, courses, lessons, learning home, insights, and weakness
+views while defaulting safely to the existing local profile.
 
 ### Stage 2 — Shared navigation shell
 

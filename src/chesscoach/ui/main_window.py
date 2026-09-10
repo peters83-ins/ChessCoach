@@ -413,6 +413,7 @@ class MainWindow(QMainWindow):
             self.coach_settings,
             preferences=self.preferences,
             preference_settings=self.preference_settings,
+            repository=self.coach_repository,
             parent=self,
         )
         dialog.settings_saved.connect(self.apply_settings)
@@ -834,7 +835,9 @@ class MainWindow(QMainWindow):
         self.active = False
         self.review = review
         self.review_cache.clear()
-        self.coach_bundle = CoachPipeline(self.coach_repository).load(data)
+        self.coach_bundle = CoachPipeline(
+            self.coach_repository, self.preferences.profile_id
+        ).load(data)
         self.coach_panel.clear()
         self.coach_panel.set_game_context(data.moves)
         self.review_details = (
@@ -1007,6 +1010,7 @@ class MainWindow(QMainWindow):
             self.coach_repository,
             settings,
             self.preferences.engine_profile(),
+            self.preferences.profile_id,
         )
 
     def coach_progress(self, progress: AnalysisProgress) -> None:
@@ -1173,7 +1177,12 @@ class MainWindow(QMainWindow):
     def open_practice(self) -> None:
         self._show_destination(
             "practice",
-            lambda: PracticeQueueDialog(self.coach_repository, self, self.course_catalog),
+            lambda: PracticeQueueDialog(
+                self.coach_repository,
+                self,
+                self.course_catalog,
+                profile_id=self.preferences.profile_id,
+            ),
         )
 
     def show_play_workspace(self) -> None:
@@ -1192,12 +1201,15 @@ class MainWindow(QMainWindow):
             self.show_play_workspace()
 
     def open_lessons(self) -> None:
-        lessons = self.coach_repository.lessons()
+        lessons = self.coach_repository.lessons(self.preferences.profile_id)
         if not lessons:
             self.statusBar().showMessage("No lessons yet. Analyze a game to create them.")
             return
         self._show_destination(
-            "lessons", lambda: LessonsDialog(lessons, self.coach_repository, self)
+            "lessons",
+            lambda: LessonsDialog(
+                lessons, self.coach_repository, self, profile_id=self.preferences.profile_id
+            ),
         )
 
     def open_courses(self) -> None:
@@ -1213,7 +1225,11 @@ class MainWindow(QMainWindow):
 
     def _make_insights(self) -> InsightsDialog:
         dialog = InsightsDialog(
-            self.coach_repository, self.database, self.course_catalog, self
+            self.coach_repository,
+            self.database,
+            self.course_catalog,
+            self,
+            profile_id=self.preferences.profile_id,
         )
         dialog.example_requested.connect(self.open_game_example)
         dialog.theme_practice_requested.connect(self.open_practice_theme)
@@ -1232,19 +1248,34 @@ class MainWindow(QMainWindow):
         if course is not None:
             self._show_destination(
                 f"course:{course.id}",
-                lambda: CourseDetailDialog(course, self.coach_repository, self),
+                lambda: CourseDetailDialog(
+                    course,
+                    self.coach_repository,
+                    self,
+                    profile_id=self.preferences.profile_id,
+                ),
             )
 
     def open_practice_theme(self, theme: str) -> None:
         self._show_destination(
             "practice",
             lambda: PracticeQueueDialog(
-                self.coach_repository, self, self.course_catalog, initial_theme=theme
+                self.coach_repository,
+                self,
+                self.course_catalog,
+                initial_theme=theme,
+                profile_id=self.preferences.profile_id,
             ),
         )
 
     def _make_learning_home(self) -> LearningHomeDialog:
-        dialog = LearningHomeDialog(self.coach_repository, self.course_catalog, self.database, self)
+        dialog = LearningHomeDialog(
+            self.coach_repository,
+            self.course_catalog,
+            self.database,
+            self,
+            profile_id=self.preferences.profile_id,
+        )
         dialog.action_requested.connect(self._learning_action)
         return dialog
 
@@ -1276,6 +1307,7 @@ class MainWindow(QMainWindow):
                         self.coach_repository,
                         self,
                         start_exercise_id=exercise_id,
+                        profile_id=self.preferences.profile_id,
                     ),
                 )
         elif action == "weaknesses":
@@ -1291,7 +1323,9 @@ class MainWindow(QMainWindow):
         self._show_destination("weaknesses", self._make_weaknesses)
 
     def _make_weaknesses(self) -> WeaknessDashboardDialog:
-        dialog = WeaknessDashboardDialog(self.coach_repository, self)
+        dialog = WeaknessDashboardDialog(
+            self.coach_repository, self, profile_id=self.preferences.profile_id
+        )
         dialog.example_requested.connect(self.open_game_example)
         return dialog
 

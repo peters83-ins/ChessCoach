@@ -18,6 +18,7 @@ class UserPreferences:
     coach_verbosity: str = "detailed"
     text_scale: int = 100
     bot_move_delay_ms: int = 600
+    profile_id: str = "default"
 
     @classmethod
     def load(cls, settings: QSettings) -> "UserPreferences":
@@ -32,9 +33,11 @@ class UserPreferences:
             coach_verbosity=str(settings.value("coach/verbosity", "detailed")),
             text_scale=int(str(settings.value("display/text_scale", 100))),
             bot_move_delay_ms=int(str(settings.value("play/bot_move_delay_ms", 600))),
+            profile_id=str(settings.value("learner/profile_id", "default")),
         )
 
     def save(self, settings: QSettings) -> None:
+        settings.setValue("learner/profile_id", self.profile_id)
         settings.setValue("display/orientation", self.board_orientation)
         settings.setValue("display/board_theme", self.board_theme)
         settings.setValue("display/piece_scale", self.piece_scale)

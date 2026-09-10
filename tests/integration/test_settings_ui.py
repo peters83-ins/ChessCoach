@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from chesscoach.config import Settings
 from chesscoach.preferences import UserPreferences
+from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameDatabase
 from chesscoach.ui.first_run import FirstRunWizard
 from chesscoach.ui.main_window import MainWindow
@@ -65,6 +66,14 @@ def test_bot_delay_preference_is_saved(app: QApplication, tmp_path: Path) -> Non
     dialog.bot_delay.setCurrentIndex(dialog.bot_delay.findData(300))
     dialog._save()
     assert UserPreferences.load(store).bot_move_delay_ms == 300
+
+
+def test_settings_can_select_a_saved_learner_profile(app: QApplication, tmp_path: Path) -> None:
+    repository = CoachRepository(tmp_path / "coach.sqlite3")
+    repository.create_profile("Student", "student")
+    dialog = SettingsDialog(Settings(), preferences=UserPreferences(), repository=repository)
+    dialog.profile.setCurrentIndex(dialog.profile.findData("student"))
+    assert dialog.current_preferences().profile_id == "student"
 
 
 def test_first_run_wizard_saves_playable_setup(app: QApplication, tmp_path: Path) -> None:

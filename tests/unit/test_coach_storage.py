@@ -113,6 +113,19 @@ def test_feedback_cache_uses_model_prompt_and_context(tmp_path: Path) -> None:
     assert CoachingContext(game.id, analysis.moves[0]).context_hash
 
 
+def test_pipeline_writes_learning_records_to_selected_profile(tmp_path: Path) -> None:
+    path = tmp_path / "games.sqlite3"
+    game = saved_game(path)
+    repository = CoachRepository(path)
+    repository.create_profile("Student", "student")
+    analysis = GameAnalysisService(FakeEngine, repository).analyze(
+        game, "engine", AnalysisProfile(quick_time=0.01, deep_time=0.02)
+    )
+    bundle = CoachPipeline(repository, "student").build(game, analysis)
+    assert repository.practice_items("student") == bundle.practice
+    assert repository.practice_items("default") == ()
+
+
 def test_version_one_feedback_schema_migrates_without_data_loss(tmp_path: Path) -> None:
     path = tmp_path / "old.sqlite3"
     with closing(sqlite3.connect(path)) as connection, connection:
