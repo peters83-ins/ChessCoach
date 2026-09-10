@@ -67,7 +67,7 @@ class Stockfish:
             analysis = self.analyze(
                 position,
                 limit=chess.engine.Limit(time=0.3, nodes=12_000),
-                multipv=position.legal_moves.count(),
+                multipv=min(position.legal_moves.count(), 12),
             )
             move = practice_move(analysis, position.turn, self.practice_level)
             if move not in position.legal_moves:
