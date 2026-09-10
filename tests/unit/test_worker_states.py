@@ -1,8 +1,8 @@
 import chess
 import chess.engine
 
-from chesscoach.engine.analysis import CandidateLine, PositionAnalysis
 from chesscoach.coach.worker import CoachRunner, CoachWorkerState
+from chesscoach.engine.analysis import CandidateLine, PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult, WorkerState
 
 

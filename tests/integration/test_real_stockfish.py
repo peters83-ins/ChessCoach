@@ -15,6 +15,7 @@ from chesscoach.engine.worker import EngineRunner
 from chesscoach.storage.database import GameDatabase
 from chesscoach.ui.main_window import MainWindow
 
+
 def engine_path() -> str:
     path = (
         os.getenv("CHESSCOACH_TEST_STOCKFISH", "").strip()
