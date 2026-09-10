@@ -1097,14 +1097,21 @@ class MainWindow(QMainWindow):
         elif action == "courses":
             self.open_courses()
         elif action.startswith("course:"):
-            course_id = action.removeprefix("course:")
+            target = action.removeprefix("course:").split(":", 1)
+            course_id = target[0]
+            exercise_id = target[1] if len(target) == 2 else None
             course = next(
                 (value for value in self.course_catalog.courses if value.id == course_id), None
             )
             if course is not None:
                 self._show_destination(
                     f"course:{course_id}",
-                    lambda: CourseDetailDialog(course, self.coach_repository, self),
+                    lambda: CourseDetailDialog(
+                        course,
+                        self.coach_repository,
+                        self,
+                        start_exercise_id=exercise_id,
+                    ),
                 )
         elif action == "weaknesses":
             self.open_weaknesses()

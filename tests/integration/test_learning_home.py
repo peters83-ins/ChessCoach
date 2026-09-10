@@ -19,3 +19,18 @@ def test_learning_home_empty_state_and_course_action(app: QApplication, tmp_path
     dialog.action_requested.connect(chosen.append)
     dialog.continue_course.click()
     assert chosen == ["course:italian-game-white"]
+
+
+def test_learning_home_routes_to_first_due_course_decision(
+    app: QApplication, tmp_path: Path
+) -> None:
+    repository = CoachRepository(tmp_path / "coach.sqlite3")
+    database = GameDatabase(tmp_path / "games.sqlite3")
+    catalog = CourseCatalog.built_in()
+    course = catalog.courses[0]
+    repository.enroll_course(course)
+    dialog = LearningHomeDialog(repository, catalog, database)
+    chosen: list[str] = []
+    dialog.action_requested.connect(chosen.append)
+    dialog.continue_course.click()
+    assert chosen == [f"course:{course.id}:{course.exercises[0].id}"]

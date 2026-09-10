@@ -125,10 +125,16 @@ class CourseLibraryDialog(QDialog):
 
 class CourseDetailDialog(QDialog):
     def __init__(
-        self, course: Course, repository: CoachRepository, parent: QWidget | None = None
+        self,
+        course: Course,
+        repository: CoachRepository,
+        parent: QWidget | None = None,
+        *,
+        start_exercise_id: str | None = None,
     ) -> None:
         super().__init__(parent)
         self.course, self.repository = course, repository
+        self.start_exercise_id = start_exercise_id
         self.setWindowTitle(course.title)
         layout = QVBoxLayout(self)
         layout.addWidget(
@@ -169,9 +175,16 @@ class CourseDetailDialog(QDialog):
             (
                 index
                 for index, exercise in enumerate(self.course.exercises)
-                if exercise.module_id == module_id
+                if exercise.id == self.start_exercise_id
             ),
-            0,
+            next(
+                (
+                    index
+                    for index, exercise in enumerate(self.course.exercises)
+                    if exercise.module_id == module_id
+                ),
+                0,
+            ),
         )
         CoursePlayerDialog(self.course, self.repository, self, start_index=start_index).exec()
         self.update_progress()
