@@ -193,3 +193,6 @@ selection; Back and Forward remain separate keyboard-accessible actions.
 - Each roadmap finding maps to a test, implementation branch, and acceptance result.
 - Work on a named feature branch, commit coherent changes, run Ruff, mypy, and the full
   suite, then merge only from a clean branch.
+- WSL diagnostics use `scripts/run_tests_wsl.sh`, which creates an isolated Linux
+  `.venv-wsl` and sets Qt to offscreen. The Windows `.venv` must be run from PowerShell,
+  because launching its executables through WSL interop is unsupported in some hosts.

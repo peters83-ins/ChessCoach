@@ -127,7 +127,7 @@ class EngineRunner(QObject):
 
     def cancel(self) -> None:
         self.generation += 1
-        if self.workers:
+        if self.state in {WorkerState.SEARCHING, WorkerState.READY}:
             self.state = WorkerState.CANCELLED
         for worker in self.workers:
             worker.cancel()
