@@ -33,6 +33,8 @@ class EngineArtifact:
 
 
 OpenUrl = Callable[[Request], BinaryIO]
+DEFAULT_MAX_DOWNLOAD_BYTES = 200 * 1024 * 1024
+DEFAULT_MAX_ENGINE_BYTES = 100 * 1024 * 1024
 
 
 def download_engine(
@@ -42,11 +44,12 @@ def download_engine(
     opener: OpenUrl = urlopen,
     cancelled: Event | None = None,
     chunk_size: int = 1024 * 1024,
+    max_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES,
 ) -> Path:
     """Download, hash-check, and atomically install one engine artifact."""
     artifact.validate()
-    if chunk_size < 1:
-        raise ValueError("Download chunk size must be positive.")
+    if chunk_size < 1 or max_bytes < 1:
+        raise ValueError("Download limits must be positive.")
     stop = cancelled or Event()
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(destination.suffix + ".download")
@@ -54,12 +57,24 @@ def download_engine(
     try:
         request = Request(artifact.url, headers={"User-Agent": "ChessCoach/1"})
         with opener(request) as response, temporary.open("wb") as output:
+            final_url = getattr(response, "geturl", lambda: artifact.url)()
+            if not str(final_url).lower().startswith("https://"):
+                raise EngineDownloadError("Stockfish download redirected to an insecure URL.")
+            content_length = (
+                response.headers.get("Content-Length") if hasattr(response, "headers") else None
+            )
+            if content_length is not None and int(content_length) > max_bytes:
+                raise EngineDownloadError("Stockfish download is larger than the safety limit.")
+            total = 0
             while True:
                 if stop.is_set():
                     raise EngineDownloadError("Stockfish download cancelled.")
                 chunk = response.read(chunk_size)
                 if not chunk:
                     break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise EngineDownloadError("Stockfish download is larger than the safety limit.")
                 digest.update(chunk)
                 output.write(chunk)
         if digest.hexdigest().lower() != artifact.sha256.lower():
@@ -75,9 +90,15 @@ def download_engine(
 
 
 def extract_engine_archive(
-    archive: Path, destination: Path, *, executable_name: str = "stockfish.exe"
+    archive: Path,
+    destination: Path,
+    *,
+    executable_name: str = "stockfish.exe",
+    max_bytes: int = DEFAULT_MAX_ENGINE_BYTES,
 ) -> Path:
     """Safely extract one engine executable from a verified archive."""
+    if max_bytes < 1:
+        raise ValueError("Engine size limit must be positive.")
     temporary = destination.with_suffix(destination.suffix + ".download")
     destination.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -90,8 +111,17 @@ def extract_engine_archive(
             if len(candidates) != 1:
                 raise EngineDownloadError("The Stockfish archive has no unique executable.")
             info = candidates[0]
+            if info.file_size > max_bytes:
+                raise EngineDownloadError("Stockfish executable is larger than the safety limit.")
             with source.open(info) as input_file, temporary.open("wb") as output:
-                output.write(input_file.read())
+                total = 0
+                while chunk := input_file.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise EngineDownloadError(
+                            "Stockfish executable is larger than the safety limit."
+                        )
+                    output.write(chunk)
         temporary.replace(destination)
         return destination
     except EngineDownloadError:

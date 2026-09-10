@@ -55,3 +55,27 @@ def test_artifact_rejects_non_https_or_bad_digest() -> None:
         EngineArtifact("http://example.test/file", "file", "0" * 64, "1", "license").validate()
     with pytest.raises(EngineDownloadError):
         EngineArtifact("https://example.test/file", "file", "bad", "1", "license").validate()
+
+
+class RedirectingResponse(BytesIO):
+    def geturl(self) -> str:
+        return "http://example.test/unsafe"
+
+
+def test_download_rejects_insecure_redirect(tmp_path: Path) -> None:
+    with pytest.raises(EngineDownloadError, match="insecure"):
+        download_engine(
+            artifact(b"payload"),
+            tmp_path / "engine",
+            opener=lambda _: RedirectingResponse(b"payload"),
+        )
+
+
+def test_download_size_limit_removes_partial_file(tmp_path: Path) -> None:
+    target = tmp_path / "engine"
+    with pytest.raises(EngineDownloadError, match="safety limit"):
+        download_engine(
+            artifact(b"payload"), target, opener=lambda _: BytesIO(b"payload"), max_bytes=3
+        )
+    assert not target.exists()
+    assert not target.with_suffix(".download").exists()

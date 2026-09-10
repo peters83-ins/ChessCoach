@@ -37,6 +37,14 @@ def test_extract_requires_unique_executable(tmp_path: Path) -> None:
         extract_engine_archive(archive, tmp_path / "stockfish.exe")
 
 
+def test_extract_rejects_oversized_executable(tmp_path: Path) -> None:
+    archive = tmp_path / "stockfish.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("stockfish/stockfish.exe", b"too large")
+    with pytest.raises(EngineDownloadError, match="safety limit"):
+        extract_engine_archive(archive, tmp_path / "stockfish.exe", max_bytes=3)
+
+
 def test_install_removes_verified_archive_after_extraction(tmp_path: Path) -> None:
     payload = tmp_path / "payload.zip"
     with zipfile.ZipFile(payload, "w") as output:
