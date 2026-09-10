@@ -1,6 +1,7 @@
 """Verified, atomic Stockfish downloads for first-run setup."""
 
 import hashlib
+import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,3 +72,31 @@ def download_engine(
     except (OSError, ValueError) as error:
         temporary.unlink(missing_ok=True)
         raise EngineDownloadError(f"Could not download Stockfish: {error}") from error
+
+
+def extract_engine_archive(
+    archive: Path, destination: Path, *, executable_name: str = "stockfish.exe"
+) -> Path:
+    """Safely extract one engine executable from a verified archive."""
+    temporary = destination.with_suffix(destination.suffix + ".download")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with zipfile.ZipFile(archive) as source:
+            candidates = [
+                info
+                for info in source.infolist()
+                if not info.is_dir() and Path(info.filename).name.lower() == executable_name.lower()
+            ]
+            if len(candidates) != 1:
+                raise EngineDownloadError("The Stockfish archive has no unique executable.")
+            info = candidates[0]
+            with source.open(info) as input_file, temporary.open("wb") as output:
+                output.write(input_file.read())
+        temporary.replace(destination)
+        return destination
+    except EngineDownloadError:
+        temporary.unlink(missing_ok=True)
+        raise
+    except (OSError, zipfile.BadZipFile, KeyError) as error:
+        temporary.unlink(missing_ok=True)
+        raise EngineDownloadError(f"Could not extract Stockfish: {error}") from error
