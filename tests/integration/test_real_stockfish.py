@@ -1,4 +1,4 @@
-"""Optional real subprocess tests: set CHESSCOACH_TEST_STOCKFISH to an executable."""
+"""Required real subprocess tests for an installed Stockfish executable."""
 
 import os
 import time
@@ -9,17 +9,33 @@ import chess.engine
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from chesscoach.engine.discovery import discover_engine
 from chesscoach.engine.stockfish import Stockfish
 from chesscoach.engine.worker import EngineRunner
 from chesscoach.storage.database import GameDatabase
 from chesscoach.ui.main_window import MainWindow
 
-ENGINE_PATH = os.getenv("CHESSCOACH_TEST_STOCKFISH", "")
-pytestmark = pytest.mark.skipif(not ENGINE_PATH, reason="CHESSCOACH_TEST_STOCKFISH is unset")
+def engine_path() -> str:
+    path = (
+        os.getenv("CHESSCOACH_TEST_STOCKFISH", "").strip()
+        or os.getenv("STOCKFISH_PATH", "").strip()
+        or discover_engine()
+    )
+    if not path:
+        pytest.fail(
+            "Real Stockfish tests require an executable. Set "
+            "CHESSCOACH_TEST_STOCKFISH or STOCKFISH_PATH, or install Stockfish "
+            "in the app engine directory.",
+            pytrace=False,
+        )
+    return path
+
+
+pytestmark = pytest.mark.real_stockfish
 
 
 def test_real_engine_analysis_move_and_cleanup() -> None:
-    engine = Stockfish(ENGINE_PATH)
+    engine = Stockfish(engine_path())
     try:
         assert engine.configure_difficulty(1400) >= 1400
         board = chess.Board()
@@ -34,11 +50,12 @@ def test_real_engine_analysis_move_and_cleanup() -> None:
 
 
 def test_real_worker_and_cancellation(app: QApplication) -> None:
+    path = engine_path()
     runner = EngineRunner()
     results, errors = [], []
     runner.result.connect(results.append)
     runner.error.connect(errors.append)
-    runner.search(chess.Board(), ENGINE_PATH, 1800, True)
+    runner.search(chess.Board(), path, 1800, True)
     deadline = time.monotonic() + 8
     while not results and not errors and time.monotonic() < deadline:
         app.processEvents()
@@ -47,7 +64,7 @@ def test_real_worker_and_cancellation(app: QApplication) -> None:
         assert not errors
         assert results and results[0].move in chess.Board().legal_moves
         results.clear()
-        runner.search(chess.Board(), ENGINE_PATH, 1800, True)
+        runner.search(chess.Board(), path, 1800, True)
         runner.cancel()
     finally:
         runner.shutdown()
@@ -64,8 +81,9 @@ def test_real_window_beginner_opponent(
     color: chess.Color,
     level: int,
 ) -> None:
+    path = engine_path()
     window = MainWindow(database=GameDatabase(tmp_path / "match.sqlite3"))
-    window.setup.engine_path.setText(ENGINE_PATH)
+    window.setup.engine_path.setText(path)
     window.setup.color.setCurrentIndex(0 if color else 1)
     window.setup.difficulty.setCurrentIndex(window.setup.difficulty.findData(level))
     window.show()

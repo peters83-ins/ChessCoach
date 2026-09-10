@@ -11,8 +11,10 @@ regression scope; the staged backlog below is the active queue.
 - Python 3.12+, python-chess, Stockfish, PySide6, SQLite, and optional OpenAI feedback.
 - Stockfish and python-chess are authoritative for legality, evaluation, and tactics.
 - OpenAI is an optional explanation layer and must only receive verified facts.
-- Baseline validation: 197 passed, 8 skipped on the Windows Python module test run.
-- Real-Stockfish tests are opt-in through `CHESSCOACH_TEST_STOCKFISH`.
+- Baseline validation: 200 passed on the Windows Python module test run, before
+  required real-engine execution.
+- Real-Stockfish tests are required and resolve `CHESSCOACH_TEST_STOCKFISH`,
+  `STOCKFISH_PATH`, or normal app discovery. Missing executables fail clearly.
 - Stage 0 audit harness now covers every primary destination and the visible
   non-destructive controls in three repeated offscreen passes. The current full
   run is 197 passed, 8 skipped, with aggregate coverage still at 88%.
@@ -93,13 +95,13 @@ Engine and coaching runners now expose explicit idle/searching/ready/cancelled/f
 closed states and preserve the last worker error for diagnostics. Focused tests cover
 stale generation rejection, cancellation invalidation, malformed output, and startup
 crashes. The sandbox also has deterministic tests for legal output, terminal positions,
-and stale FEN results. Timeout and real-Stockfish matrix coverage remain opt-in follow-up
-checks because the normal CI path uses fake engines.
+and stale FEN results. Timeout coverage is deterministic; the real-Stockfish matrix
+must run on a machine with an installed executable.
 The recovery suite also verifies a saved match can be reopened in a fresh window with
 its validated move history and review position intact. Full install and real-engine
 matrix execution remain environment-dependent checks.
 Timeout exceptions now have a deterministic retryable-error regression test. The only
-remaining Stage 1 execution item is the opt-in real-Stockfish matrix on a machine with
+remaining Stage 1 execution item is running the real-Stockfish matrix on a machine with
 an installed executable.
 Settings now selects a persisted learner profile, and the selected profile flows through
 coaching records, practice, courses, lessons, learning home, insights, and weakness
