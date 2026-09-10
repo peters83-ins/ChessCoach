@@ -16,7 +16,8 @@ regression scope; the staged backlog below is the active queue.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
   practice links, related-course links, Stage 3 direct learning routing, Stage 4
-  per-decision mastery display and persistence, and Stage 5 accessibility polish.
+  per-decision mastery display and persistence, Stage 5 accessibility polish, and
+  Stage 6 bulk PGN interchange.
 
 ## Audit findings
 
@@ -127,8 +128,14 @@ visual identity, reviewed offline content, and local-first data model.
 
 ### Stage 6 — Deferred extensions
 
-- Self-analysis sandbox, rich/bulk PGN import/export, multiple profiles and backup,
-  additional attributed content, cached profile comparison, and optional coach speech.
+- **Complete:** bulk PGN import/export. The parser accepts every legal standard mainline
+  in a document, rejects empty/illegal/variant games, imports each game through the
+  existing validated SQLite save path, and exposes Import PGN and Export All controls.
+  Imported games receive new IDs and preserve legal move/FEN histories.
+- **Remaining:** self-analysis sandbox, multiple profiles and backup/restore, additional
+  attributed content packs, cached analysis-profile comparison, and optional coach speech.
+  These remain separate slices because they require new persistence contracts, engine
+  interaction design, content review, or platform audio decisions.
 
 ## Acceptance and delivery
 
