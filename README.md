@@ -12,6 +12,12 @@ From the repository directory in PowerShell, use the existing virtual environmen
 .\.venv\Scripts\python.exe -m chesscoach.main
 ```
 
+OpenAI is optional. Install the runtime extra only if you want cloud explanations:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install "chesscoach[ai]"
+```
+
 If `.venv` does not exist, create it first with `py -3 -m venv .venv` using Python
 3.12 or newer. Optional activation: `.\.venv\Scripts\Activate.ps1`. Once activated,
 `python -m chesscoach.main` also launches the app.

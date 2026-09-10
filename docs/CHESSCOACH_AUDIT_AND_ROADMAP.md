@@ -194,8 +194,9 @@ selection; Back and Forward remain separate keyboard-accessible actions.
 
 Progress on this branch: course-attempt writes now use one SQLite transaction, learning/review query paths
 have additive indexes in schema version 5, and coaching connections share one timeout
-and foreign-key configuration. The full suite remains green at 213 tests; the broader
-inventory and dependency audit remains open.
+and foreign-key configuration. The OpenAI SDK is now an optional `ai` runtime extra,
+while development installs retain it for provider tests. The full suite remains green
+at 213 tests; the broader inventory and dependency audit remains open.
 
 - Inventory modules, public functions, signals, settings keys, database migrations,
   and UI actions; remove unreachable, duplicated, stale, and abandoned code only when
