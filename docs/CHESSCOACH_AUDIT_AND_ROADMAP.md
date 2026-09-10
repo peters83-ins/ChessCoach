@@ -15,7 +15,7 @@ regression scope; the staged backlog below is the active queue.
 - Real-Stockfish tests are opt-in through `CHESSCOACH_TEST_STOCKFISH`.
 - Stage 0 audit harness now covers every primary destination and the visible
   non-destructive controls in three repeated offscreen passes. The current full
-  run is 194 passed, 8 skipped, with aggregate coverage still at 88%.
+  run is 195 passed, 8 skipped, with aggregate coverage still at 88%.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
   practice links, related-course links, Stage 3 direct learning routing, Stage 4
@@ -130,6 +130,9 @@ conservative Qt shutdown cleanup are implemented and covered by unit and stress 
   correct moves.
 - Training sessions report the decision that was answered, preserve rollback state,
   accept verified alternatives, keep lines short, and provide progressive hints.
+- Learn now presents one prominent recommended action while retaining secondary browse
+  actions. Recommendations follow due practice, unfinished course work, latest-game
+  review, weakness, then course availability.
 
 ### Stage 5 — Accessibility and visual polish (complete)
 
