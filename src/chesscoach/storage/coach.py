@@ -59,6 +59,19 @@ class CourseProgress:
     updated_at: str
 
 
+@dataclass(frozen=True)
+class PlayerProfile:
+    profile_id: str
+    name: str
+    created_at: str
+
+
+@dataclass(frozen=True)
+class CachedProfileSummary:
+    profile: str
+    runs: int
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -133,6 +146,69 @@ class CoachRepository:
                     (SCHEMA_VERSION,),
                 )
 
+    def profiles(self) -> tuple[PlayerProfile, ...]:
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(
+                "SELECT id, name, created_at FROM player_profiles ORDER BY created_at, id"
+            ).fetchall()
+        return tuple(PlayerProfile(str(row[0]), str(row[1]), str(row[2])) for row in rows)
+
+    def create_profile(self, name: str, profile_id: str | None = None) -> PlayerProfile:
+        """Create a stable profile identifier without copying another profile's data."""
+        clean_name = " ".join(name.split())
+        if not clean_name:
+            raise ValueError("Profile name cannot be empty.")
+        identifier = profile_id or str(uuid4())
+        if not identifier.strip() or identifier == DEFAULT_PROFILE_ID:
+            raise ValueError("Profile identifier is reserved or empty.")
+        profile = PlayerProfile(identifier, clean_name, _now())
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            try:
+                connection.execute(
+                    "INSERT INTO player_profiles(id, name, created_at) VALUES (?, ?, ?)",
+                    (profile.profile_id, profile.name, profile.created_at),
+                )
+            except sqlite3.IntegrityError as error:
+                raise ValueError("Profile identifier already exists.") from error
+        return profile
+
+    def delete_profile(self, profile_id: str) -> bool:
+        """Delete a non-default profile and its learning records atomically."""
+        if profile_id == DEFAULT_PROFILE_ID:
+            raise ValueError("The default profile cannot be deleted.")
+        self.migrate()
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            exists = connection.execute(
+                "SELECT 1 FROM player_profiles WHERE id=?", (profile_id,)
+            ).fetchone()
+            if exists is None:
+                return False
+            for table in (
+                "weakness_events",
+                "dismissed_weaknesses",
+                "practice_items",
+                "practice_attempts",
+                "lessons",
+                "lesson_progress",
+                "course_progress",
+                "course_mastery",
+                "course_attempts",
+            ):
+                column = "profile_id"
+                if table == "lesson_progress":
+                    continue
+                if table == "practice_attempts":
+                    connection.execute(
+                        "DELETE FROM practice_attempts WHERE item_id IN "
+                        "(SELECT id FROM practice_items WHERE profile_id=?)",
+                        (profile_id,),
+                    )
+                    continue
+                connection.execute(f"DELETE FROM {table} WHERE {column}=?", (profile_id,))
+            connection.execute("DELETE FROM player_profiles WHERE id=?", (profile_id,))
+        return True
     @staticmethod
     def _detect_schema_version(connection: sqlite3.Connection) -> int:
         exists = connection.execute(
@@ -290,6 +366,29 @@ class CoachRepository:
         return (
             AnalysisRunStatus(str(row[0]), int(row[1]), int(row[2]), str(row[3])) if row else None
         )
+
+    def cached_profile_summaries(
+        self, game_id: str | None = None
+    ) -> tuple[CachedProfileSummary, ...]:
+        """Return completed cached analysis profile counts for comparison views."""
+        if not self.path.is_file():
+            return ()
+        self.migrate()
+        query = "SELECT profile_json FROM analysis_runs WHERE state='complete'"
+        parameters: tuple[str, ...] = ()
+        if game_id is not None:
+            query += " AND game_id=?"
+            parameters = (game_id,)
+        with closing(sqlite3.connect(self.path)) as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        counts: dict[str, int] = {}
+        for row in rows:
+            try:
+                profile = str(json.loads(str(row[0])).get("name", "standard"))
+            except (TypeError, json.JSONDecodeError):
+                profile = "standard"
+            counts[profile] = counts.get(profile, 0) + 1
+        return tuple(CachedProfileSummary(name, counts[name]) for name in sorted(counts))
 
     def game_learning_statuses(self, game_ids: tuple[str, ...]) -> dict[str, GameLearningStatus]:
         """Return library badges without loading full analyses or practice records."""

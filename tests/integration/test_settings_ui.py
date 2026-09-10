@@ -94,3 +94,10 @@ def test_main_window_settings_and_diagnostics_buttons(app: QApplication, tmp_pat
     window.diagnostics_button.click()
     assert window.workspace_stack.currentWidget() is window.destination_dialogs["diagnostics"]
     window.close()
+
+
+def test_main_window_exposes_backup_and_restore_controls(app: QApplication, tmp_path: Path) -> None:
+    window = MainWindow(database=GameDatabase(tmp_path / "games.sqlite3"))
+    assert window.backup_button.accessibleName() == "Backup Chess Coach data"
+    assert window.restore_button.accessibleName() == "Restore Chess Coach data"
+    window.close()

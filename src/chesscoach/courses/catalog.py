@@ -28,6 +28,22 @@ class CourseCatalog:
         return cls.from_data(payload)
 
     @classmethod
+    def from_directory(cls, path: Path) -> "CourseCatalog":
+        """Load and combine reviewed JSON course packs from a directory."""
+        if not path.is_dir():
+            raise CourseCatalogError(f"Course directory does not exist: {path}")
+        files = tuple(sorted(path.glob("*.json")))
+        if not files:
+            raise CourseCatalogError(f"Course directory is empty: {path}")
+        courses: list[Course] = []
+        for file in files:
+            courses.extend(cls.from_file(file).courses)
+        ids = [course.id for course in courses]
+        if len(ids) != len(set(ids)):
+            raise CourseCatalogError("Course IDs must be unique across content packs.")
+        return cls(tuple(courses))
+
+    @classmethod
     def from_data(cls, payload: Any) -> "CourseCatalog":
         if not isinstance(payload, dict) or payload.get("schema_version") != cls.SCHEMA_VERSION:
             raise CourseCatalogError("Unsupported course schema version.")

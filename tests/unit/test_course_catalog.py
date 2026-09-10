@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from chesscoach.courses.catalog import CourseCatalog, CourseCatalogError
@@ -74,3 +76,9 @@ def test_built_in_starter_courses_are_complete():
     assert all(len(course.exercises) == 8 and course.attribution for course in catalog.courses)
     assert catalog.courses[0].exercises[0].fen.split()[1] == "w"
     assert all(course.exercises[0].fen.split()[1] == "b" for course in catalog.courses[1:])
+
+
+def test_catalog_loads_multiple_content_packs(tmp_path):
+    for name in ("one.json", "two.json"):
+        (tmp_path / name).write_text(json.dumps({"schema_version": 1, "courses": []}))
+    assert CourseCatalog.from_directory(tmp_path).courses == ()

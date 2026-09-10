@@ -25,6 +25,7 @@ from chesscoach.coach.training import TrainingSession
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameDatabase
 from chesscoach.ui.chess_board import ChessBoard
+from chesscoach.ui.speech import SpeechService
 
 
 class CoachPanel(QWidget):
@@ -74,6 +75,17 @@ class CoachPanel(QWidget):
         self.report.setWordWrap(True)
         layout.addWidget(self.report)
         layout.addWidget(self.feedback)
+        self.speak_button = QPushButton("Read feedback aloud")
+        self.speak_button.setAccessibleName("Read coach feedback aloud")
+        self.speech = SpeechService(self)
+        self.speak_button.setEnabled(self.speech.available)
+        self.speak_button.setToolTip(
+            "Read the current local or AI feedback aloud."
+            if self.speech.available
+            else "Text-to-speech is unavailable on this system."
+        )
+        self.speak_button.clicked.connect(lambda: self.speech.speak(self.feedback.text()))
+        layout.addWidget(self.speak_button)
         learning = QHBoxLayout()
         self.practice_button = QPushButton("Practice")
         self.lessons_button = QPushButton("Lessons")
