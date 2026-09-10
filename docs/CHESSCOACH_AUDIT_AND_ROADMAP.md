@@ -77,7 +77,7 @@ visual identity, reviewed offline content, and local-first data model.
 ### Stage 1 — Reliability and engine confidence
 
 Stage 0 baseline work is complete on `audit/baseline-harness`; the remaining items
-below are the next reliability implementation stage.
+below are the final reliability checks for this release.
 
 - Add worker timeout and cancellation interaction coverage; malformed output and
   startup-process crashes now have deterministic regression coverage.
@@ -98,6 +98,9 @@ checks because the normal CI path uses fake engines.
 The recovery suite also verifies a saved match can be reopened in a fresh window with
 its validated move history and review position intact. Full install and real-engine
 matrix execution remain environment-dependent checks.
+Timeout exceptions now have a deterministic retryable-error regression test. The only
+remaining Stage 1 execution item is the opt-in real-Stockfish matrix on a machine with
+an installed executable.
 Settings now selects a persisted learner profile, and the selected profile flows through
 coaching records, practice, courses, lessons, learning home, insights, and weakness
 views while defaulting safely to the existing local profile.
@@ -196,3 +199,14 @@ selection; Back and Forward remain separate keyboard-accessible actions.
 - WSL diagnostics use `scripts/run_tests_wsl.sh`, which creates an isolated Linux
   `.venv-wsl` and sets Qt to offscreen. The Windows `.venv` must be run from PowerShell,
   because launching its executables through WSL interop is unsupported in some hosts.
+
+## Finding-to-test status
+
+| Finding | Current regression coverage | Remaining acceptance check |
+| --- | --- | --- |
+| AUD-002 | Audit stress, worker failure, sandbox, and recovery tests | Raise aggregate coverage to 90% when the native test run is available |
+| AUD-003 | Fake-engine startup, malformed-output, timeout, and retry tests | Run the real Stockfish 800/1000/1200/full matrix |
+| AUD-004 | Generation/FEN rejection, delayed cancellation, and fresh-window recovery tests | Repeat the matrix on native Windows during release verification |
+| AUD-006 | Qt accessible-name, focus, and keyboard contract tests | Complete the documented Windows screen-reader pass |
+| AUD-007 | Sample safeguards and supporting evidence links | Add richer chart interaction coverage |
+| AUD-008 | Responsive board, scrollbar, focus, and empty-state tests | Review chart readability at supported scaled-text sizes |
