@@ -171,8 +171,11 @@ selection; Back and Forward remain separate keyboard-accessible actions.
   versioned, python-chess-validated JSON packs and rejects duplicate course IDs.
 - **Complete:** optional coach speech. The coach panel offers a read-aloud control when
   Qt's platform speech backend is available and remains local-only otherwise.
-- **Scope note:** profile selection and engine-backed sandbox analysis remain follow-up
-  product work; these APIs preserve the data boundary needed to add them safely.
+- **Complete:** profile selection is threaded through settings, coaching, practice,
+  lessons, courses, insights, and learning-home recommendations. The sandbox now
+  supports optional Stockfish analysis with a bounded ELO control, concise legal SAN
+  output, explicit loading/cancel/error states, terminal-position handling, and FEN
+  checks that reject stale results.
 
 ## Acceptance and delivery
 

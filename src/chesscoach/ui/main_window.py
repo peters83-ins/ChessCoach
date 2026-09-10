@@ -364,7 +364,10 @@ class MainWindow(QMainWindow):
             self.status_label.setText(message)
 
     def open_sandbox(self) -> None:
-        self._show_destination("sandbox", lambda: AnalysisSandboxDialog(self))
+        self._show_destination(
+            "sandbox",
+            lambda: AnalysisSandboxDialog(self, engine_path=self.setup.engine_path.text().strip()),
+        )
 
     def backup_data(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
