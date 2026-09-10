@@ -108,7 +108,7 @@ Settings now selects a persisted learner profile, and the selected profile flows
 coaching records, practice, courses, lessons, learning home, insights, and weakness
 views while defaulting safely to the existing local profile.
 
-### Stage 2 — Shared navigation shell
+### Stage 2 — Shared navigation shell (complete)
 
 - A shared workspace stack now hosts Learn, Courses, Practice, Lessons, Insights,
   Games, Settings, Diagnostics, and Review, with a Back action returning to Play.
@@ -118,9 +118,10 @@ views while defaulting safely to the existing local profile.
   unsaved-work handling.
 - Add rapid-switching and repeated-click GUI tests (initial coverage is in place).
 
-The typed workspace navigator, bounded Back/Forward history, page reuse, and
-conservative Qt shutdown cleanup are implemented and covered by unit and stress tests.
-Primary destinations now use a compact vertical rail with exclusive active-state
+The typed workspace navigator, bounded Back/Forward history, page reuse, unsaved-match
+preservation, and conservative Qt shutdown cleanup are implemented and covered by unit
+and stress tests. Returning to Play now records navigation history instead of resetting
+the stack. Primary destinations use a compact vertical rail with exclusive active-state
 selection; Back and Forward remain separate keyboard-accessible actions.
 
 ### Stage 3 — Review and learning parity (complete)
