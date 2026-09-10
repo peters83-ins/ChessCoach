@@ -1,6 +1,6 @@
 # Chess Coach Engine, GUI, and Workflow Audit
 
-Updated: 2026-09-09
+Updated: 2026-09-10
 
 This is the canonical audit and development roadmap. It consolidates the former
 first-pass backlog, UX audit, and roadmap status documents. Completed work remains
@@ -11,7 +11,7 @@ regression scope; the staged backlog below is the active queue.
 - Python 3.12+, python-chess, Stockfish, PySide6, SQLite, and optional OpenAI feedback.
 - Stockfish and python-chess are authoritative for legality, evaluation, and tactics.
 - OpenAI is an optional explanation layer and must only receive verified facts.
-- Baseline validation: 211 passed in 39.72 seconds on the WSL Python 3.12 run,
+- Baseline validation: 213 passed in 54.59 seconds on the WSL Python 3.12 run,
   including the required real Stockfish process and GUI tests.
 - Real-Stockfish tests are required and resolve `CHESSCOACH_TEST_STOCKFISH`,
   `STOCKFISH_PATH`, or normal app discovery. Missing executables fail clearly.
@@ -28,9 +28,9 @@ regression scope; the staged backlog below is the active queue.
 
 | ID | Severity | Area | Reproduction | Expected | Current finding | Regression / acceptance |
 | --- | --- | --- | --- | --- | --- | --- |
-| AUD-001 | high | Navigation | Open several toolbar destinations quickly | One stable workspace should switch instantly | Remaining destinations are dialog-based and can block or stack workflows | Scripted rapid switching leaves one active destination with no uncaught exception |
+| AUD-001 | high | Navigation | Open several toolbar destinations quickly | One stable workspace should switch instantly | Typed shared workspace navigation is implemented; native accessibility verification and rare-tool workflow polish remain | Scripted rapid switching leaves one active destination with no uncaught exception |
 | AUD-002 | medium | Coverage | Inspect coverage after the full suite | Core UI and workers should have meaningful interaction coverage | Course UI, Insights UI, engine workers, and MainWindow paths remain lower coverage | Add focused Qt tests for controls, failure paths, and stale results |
-| AUD-003 | high | Engine | Run without a configured executable | The app should explain the state and recover | Real Stockfish validation is skipped unless explicitly configured | Fake-engine tests cover deterministic behavior; opt-in real matrix passes at 800/1000/1200 and full strength |
+| AUD-003 | high | Engine | Run without a configured executable | The app should explain the state and recover | The installed Stockfish 19 matrix is passing; CI still requires an explicit executable or app-discovery install | Fake-engine tests cover deterministic behavior; opt-in real matrix passes at 800/1000/1200 and full strength |
 | AUD-004 | high | Engine worker | Replace the board while a search is running | A stale result must never alter the new position | Generation/FEN protections exist but require stress regression coverage | Repeated new-game, undo, load, close, and delayed-result sequences remain safe |
 | AUD-005 | medium | Learning workflow | Open Learn with an enrolled course | Continue should open the exact next module/decision | Course links and resume paths need a shared destination model | One action reaches the saved module or first due decision |
 | AUD-006 | medium | Accessibility | Navigate course and board controls by keyboard/screen reader | Every control has a name, focus state, and predictable order | Labels exist for major course/board controls; native verification remains | Scripted focus assertions plus documented Windows keyboard/screen-reader pass |
@@ -113,7 +113,6 @@ views while defaulting safely to the existing local profile.
 - A shared workspace stack now hosts Learn, Courses, Practice, Lessons, Insights,
   Games, Settings, Diagnostics, and Review, with a Back action returning to Play.
 - Focused exercises, confirmations, and setup prompts remain dialogs.
-- Keep focused exercises, confirmations, and setup prompts as dialogs.
 - Preserve one active destination, back/forward behavior, keyboard navigation, and
   unsaved-work handling.
 - Add rapid-switching and repeated-click GUI tests (initial coverage is in place).
