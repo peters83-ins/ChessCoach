@@ -15,6 +15,7 @@ def test_learning_home_empty_state_and_course_action(app: QApplication, tmp_path
     dialog = LearningHomeDialog(repository, catalog, database)
     assert "opening course" in dialog.recommendation.text()
     assert dialog.continue_course.isEnabled()
+    assert dialog.next_action.text() == "Start an opening course"
     chosen: list[str] = []
     dialog.action_requested.connect(chosen.append)
     dialog.continue_course.click()
@@ -35,3 +36,20 @@ def test_learning_home_routes_to_first_due_course_decision(
     dialog.action_requested.connect(chosen.append)
     dialog.continue_course.click()
     assert chosen == [f"course:{course.id}:{course.exercises[0].id}"]
+
+
+def test_learning_home_primary_action_routes_to_due_practice(
+    app: QApplication, tmp_path: Path
+) -> None:
+    repository = CoachRepository(tmp_path / "coach.sqlite3")
+    database = GameDatabase(tmp_path / "games.sqlite3")
+    catalog = CourseCatalog.built_in()
+    course = catalog.courses[0]
+    repository.enroll_course(course)
+    repository.record_course_attempt(course.id, course.exercises[0].id, 0, "e2e4", False)
+    dialog = LearningHomeDialog(repository, catalog, database)
+    chosen: list[str] = []
+    dialog.action_requested.connect(chosen.append)
+    assert dialog.next_action.text() == "Practice due decisions"
+    dialog.next_action.click()
+    assert chosen == ["practice"]

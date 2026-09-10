@@ -30,6 +30,11 @@ class LearningHomeDialog(QDialog):
         self.recommendation = QLabel()
         self.recommendation.setWordWrap(True)
         layout.addWidget(self.recommendation)
+        self.next_action = QPushButton("Start recommended activity")
+        self.next_action.setObjectName("primaryAction")
+        self.next_action.setAccessibleName("Start recommended learning activity")
+        self.next_action.clicked.connect(self._choose_recommended)
+        layout.addWidget(self.next_action)
         self.continue_course = QPushButton("Continue course")
         self.practice_due = QPushButton("Practice due today")
         self.review_latest = QPushButton("Review latest game")
@@ -56,6 +61,7 @@ class LearningHomeDialog(QDialog):
         games = self.database.list_games()
         weaknesses = self.repository.weakness_details()
         course_available = bool(self.catalog.courses)
+        self.next_action_key = "courses"
         self.continue_course.setEnabled(course_available)
         self.course_library.setEnabled(course_available)
         self.practice_due.setEnabled(practice.due > 0 or bool(due_courses))
@@ -80,29 +86,45 @@ class LearningHomeDialog(QDialog):
             else "Analyze a game to identify a learning theme."
         )
         if practice.due or due_courses:
+            self.next_action_key = "practice"
+            self.next_action.setText("Practice due decisions")
             self.recommendation.setText(
                 "Practice is due. A short local session will reinforce your current decisions."
             )
         elif progress:
+            self.next_action_key = "continue"
+            self.next_action.setText("Continue course")
             self.recommendation.setText(
                 "Continue your enrolled course and keep building decision-level mastery."
             )
         elif games:
+            self.next_action_key = "latest"
+            self.next_action.setText("Review latest game")
             self.recommendation.setText(
                 "Review your latest saved game to find the next practice position."
             )
         elif weaknesses:
+            self.next_action_key = "weaknesses"
+            self.next_action.setText("Study weakest theme")
             self.recommendation.setText(
                 f"Your current focus is {weaknesses[0].theme.replace('_', ' ')}."
             )
         elif course_available:
+            self.next_action_key = "continue"
+            self.next_action.setText("Start an opening course")
             self.recommendation.setText(
                 "Start a short opening course to build a practical repertoire."
             )
         else:
+            self.next_action.setText("Browse learning options")
             self.recommendation.setText(
                 "Play or import a game, then return here for a grounded next step."
             )
+
+        self.next_action.setToolTip(self.recommendation.text())
+
+    def _choose_recommended(self) -> None:
+        self._choose(self.next_action_key)
 
     def _choose(self, action: str) -> None:
         if action == "continue":
