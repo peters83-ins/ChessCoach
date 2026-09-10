@@ -15,7 +15,8 @@ regression scope; the staged backlog below is the active queue.
 - Real-Stockfish tests are opt-in through `CHESSCOACH_TEST_STOCKFISH`.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
-  practice links, related-course links, and Stage 3 direct learning routing.
+  practice links, related-course links, Stage 3 direct learning routing, and Stage 4
+  per-decision mastery display and persistence.
 
 ## Audit findings
 
@@ -101,12 +102,16 @@ visual identity, reviewed offline content, and local-first data model.
 - Limited-strength play uses weighted, legal variation between equivalent engine-ranked
   moves; full-strength analysis and review remain deterministic.
 
-### Stage 4 — Learning quality
+### Stage 4 — Learning quality (complete)
 
-- Keep opening, phase, and tactical transfer metrics sample-safe and inspectable.
-- Apply theme and previously-failed filters to every practice entry point.
-- Show per-decision mastery and completion clearly.
-- Keep exercises short, forgiving, engine-verified, and progressively hinted.
+- Opening, phase, and tactical transfer metrics remain local, sample-safe, and linked
+  to inspectable game or practice evidence.
+- Practice queue entry points expose theme and previously-failed filters with counts.
+- Course detail and player views show per-decision level, attempts, errors, hints, and
+  exercise completion; every learner decision is persisted, including intermediate
+  correct moves.
+- Training sessions report the decision that was answered, preserve rollback state,
+  accept verified alternatives, keep lines short, and provide progressive hints.
 
 ### Stage 5 — Accessibility and visual polish
 
