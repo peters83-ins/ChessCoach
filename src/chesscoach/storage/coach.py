@@ -116,6 +116,7 @@ def _move_from_dict(data: dict[str, Any]) -> MoveAnalysis:
 class CoachRepository:
     def __init__(self, path: Path) -> None:
         self.path = path
+        self._schema_ready = False
 
     def _connect(self) -> sqlite3.Connection:
         """Open a consistently configured repository connection."""
@@ -124,6 +125,10 @@ class CoachRepository:
         return connection
 
     def migrate(self) -> None:
+        # A repository instance owns one database path. Avoid reopening and
+        # rechecking the schema on every read/write in a review session.
+        if self._schema_ready and self.path.is_file():
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as connection, connection:
             connection.execute(
@@ -153,6 +158,7 @@ class CoachRepository:
                     "ON CONFLICT(component) DO UPDATE SET version=excluded.version",
                     (SCHEMA_VERSION,),
                 )
+            self._schema_ready = True
 
     def profiles(self) -> tuple[PlayerProfile, ...]:
         self.migrate()

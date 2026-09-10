@@ -183,3 +183,20 @@ def test_lesson_step_is_persistent(tmp_path: Path) -> None:
     assert repository.lesson_step("lesson") == 3
     repository.set_lesson_completed("lesson", True, step=4)
     assert repository.lesson_step("lesson") == 4
+
+
+def test_repository_reuses_migration_state_for_session_reads(tmp_path: Path) -> None:
+    repository = CoachRepository(tmp_path / "coach.sqlite3")
+    calls = 0
+    original = repository._connect
+
+    def counted_connection():
+        nonlocal calls
+        calls += 1
+        return original()
+
+    repository._connect = counted_connection  # type: ignore[method-assign]
+    repository.migrate()
+    repository.profiles()
+    repository.profiles()
+    assert calls == 3  # one migration connection and one per actual read
