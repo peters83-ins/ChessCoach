@@ -11,13 +11,13 @@ regression scope; the staged backlog below is the active queue.
 - Python 3.12+, python-chess, Stockfish, PySide6, SQLite, and optional OpenAI feedback.
 - Stockfish and python-chess are authoritative for legality, evaluation, and tactics.
 - OpenAI is an optional explanation layer and must only receive verified facts.
-- Baseline validation: 166 passed, 8 skipped; coverage approximately 88%.
+- Baseline validation: 186 passed, 8 skipped on the Windows Python module test run.
 - Real-Stockfish tests are opt-in through `CHESSCOACH_TEST_STOCKFISH`.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
   practice links, related-course links, Stage 3 direct learning routing, Stage 4
   per-decision mastery display and persistence, Stage 5 accessibility polish, and
-  Stage 6 bulk PGN interchange.
+  Stage 6 extensions.
 
 ## Audit findings
 
@@ -126,16 +126,25 @@ visual identity, reviewed offline content, and local-first data model.
   supported desktop runtime; manual screen-reader testing remains an operational check
   for release machines rather than an untested code path.
 
-### Stage 6 — Deferred extensions
+### Stage 6 — Extensions (complete)
 
 - **Complete:** bulk PGN import/export. The parser accepts every legal standard mainline
   in a document, rejects empty/illegal/variant games, imports each game through the
   existing validated SQLite save path, and exposes Import PGN and Export All controls.
   Imported games receive new IDs and preserve legal move/FEN histories.
-- **Remaining:** self-analysis sandbox, multiple profiles and backup/restore, additional
-  attributed content packs, cached analysis-profile comparison, and optional coach speech.
-  These remain separate slices because they require new persistence contracts, engine
-  interaction design, content review, or platform audio decisions.
+- **Complete:** self-analysis sandbox. The app provides an offline legal board, FEN
+  loading, current-position copying, and explicit status feedback without treating
+  prose or an LLM as an engine authority.
+- **Complete:** profile and portability foundations. Coach storage supports creating
+  and deleting non-default learner profiles, cached profile-run summaries, and atomic
+  backup/restore of the games and coaching SQLite databases. Main-window Backup Data
+  and Restore Data controls use the validated archive service.
+- **Complete:** additional content-pack loading. `CourseCatalog.from_directory` combines
+  versioned, python-chess-validated JSON packs and rejects duplicate course IDs.
+- **Complete:** optional coach speech. The coach panel offers a read-aloud control when
+  Qt's platform speech backend is available and remains local-only otherwise.
+- **Scope note:** profile selection and engine-backed sandbox analysis remain follow-up
+  product work; these APIs preserve the data boundary needed to add them safely.
 
 ## Acceptance and delivery
 

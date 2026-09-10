@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from chesscoach.chess.openings import OpeningMatch
 from chesscoach.coach.insights import (
     analyzed_theme_counts,
+    compare_analysis_profiles,
     opening_departure_transfer,
     opening_stats,
     period_comparison,
@@ -14,6 +15,14 @@ from chesscoach.coach.insights import (
     transfer_metric,
 )
 from chesscoach.coach.models import EngineScore, GamePhase, MoveAnalysis, MoveClassification
+
+
+def test_compare_analysis_profiles_groups_cached_runs():
+    result = compare_analysis_profiles((("quick", 80.0), ("quick", 90.0), ("deep", 100.0)))
+    assert [(item.profile, item.runs, item.mean_accuracy) for item in result] == [
+        ("deep", 1, 100.0),
+        ("quick", 2, 85.0),
+    ]
 
 
 def test_opening_stats_require_five_games():

@@ -38,6 +38,7 @@ from chesscoach.courses.catalog import CourseCatalog
 from chesscoach.engine.analysis import PositionAnalysis
 from chesscoach.engine.worker import EngineRunner, SearchResult
 from chesscoach.preferences import UserPreferences
+from chesscoach.storage.backup import BackupError, create_backup, restore_backup
 from chesscoach.storage.coach import CoachRepository
 from chesscoach.storage.database import GameData, GameDatabase, SavedGameSummary
 from chesscoach.storage.match import BotMatch
@@ -53,6 +54,7 @@ from chesscoach.ui.learning_center import PracticeQueueDialog, WeaknessDashboard
 from chesscoach.ui.learning_home import LearningHomeDialog
 from chesscoach.ui.match_setup import MatchSetup
 from chesscoach.ui.move_history import BADGES, MoveHistory
+from chesscoach.ui.sandbox import AnalysisSandboxDialog
 from chesscoach.ui.saved_games import SavedGamesDialog
 from chesscoach.ui.settings_dialog import SettingsDialog
 from chesscoach.ui.theme import MODERN_STYLESHEET
@@ -240,6 +242,11 @@ class MainWindow(QMainWindow):
         self.save_button.setToolTip(str(self.database.path))
         self.load_button = QPushButton("Load Saved Game")
         self.import_pgn_button = QPushButton("Import PGN…")
+        self.sandbox_button = QPushButton("Self-analysis Sandbox")
+        self.backup_button = QPushButton("Backup Data…")
+        self.restore_button = QPushButton("Restore Data…")
+        self.backup_button.setAccessibleName("Backup Chess Coach data")
+        self.restore_button.setAccessibleName("Restore Chess Coach data")
         self.retry_button = QPushButton("Retry Engine")
         self.review_game_button = QPushButton("Review Game")
         self.review_game_button.hide()
@@ -255,6 +262,9 @@ class MainWindow(QMainWindow):
             self.save_button,
             self.load_button,
             self.import_pgn_button,
+            self.sandbox_button,
+            self.backup_button,
+            self.restore_button,
             self.retry_button,
             self.review_game_button,
             self.settings_button,
@@ -268,6 +278,9 @@ class MainWindow(QMainWindow):
         self.save_button.clicked.connect(self.save_match)
         self.load_button.clicked.connect(self.load_saved_game)
         self.import_pgn_button.clicked.connect(self.import_pgn)
+        self.sandbox_button.clicked.connect(self.open_sandbox)
+        self.backup_button.clicked.connect(self.backup_data)
+        self.restore_button.clicked.connect(self.restore_data)
         self.retry_button.clicked.connect(self.retry_engine)
         self.review_game_button.clicked.connect(self.review_current_game)
         self.settings_button.clicked.connect(self.open_settings)
@@ -305,6 +318,7 @@ class MainWindow(QMainWindow):
             self.save_button,
             self.load_button,
             self.import_pgn_button,
+            self.sandbox_button,
             self.retry_button,
             self.review_game_button,
             self.settings_button,
@@ -317,6 +331,37 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(message)
         if not self.active and not self.review_details:
             self.status_label.setText(message)
+
+    def open_sandbox(self) -> None:
+        self._show_destination("sandbox", lambda: AnalysisSandboxDialog(self))
+
+    def backup_data(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Backup Chess Coach data", "chesscoach-backup.zip"
+        )
+        if not path:
+            return
+        try:
+            create_backup(self.database.path, self.coach_repository.path, Path(path))
+        except BackupError as error:
+            self.statusBar().showMessage(f"Backup failed: {error}", 6000)
+        else:
+            self.statusBar().showMessage(f"Backup saved to {path}", 6000)
+
+    def restore_data(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Restore Chess Coach data", "", "Zip archives (*.zip)"
+        )
+        if not path:
+            return
+        try:
+            restore_backup(
+                Path(path), self.database.path, self.coach_repository.path, overwrite=True
+            )
+        except BackupError as error:
+            self.statusBar().showMessage(f"Restore failed: {error}", 6000)
+        else:
+            self.statusBar().showMessage("Data restored. Restart Chess Coach to reload it.", 6000)
 
     def maybe_show_first_run(self) -> None:
         if not QSettings().value("setup/complete", False, bool):

@@ -14,6 +14,30 @@ from chesscoach.coach.models import MoveAnalysis
 
 
 @dataclass(frozen=True)
+class ProfileComparison:
+    """Summary of cached analysis runs grouped by profile name."""
+
+    profile: str
+    runs: int
+    mean_accuracy: float
+
+
+def compare_analysis_profiles(
+    records: Iterable[tuple[str, float]],
+) -> tuple[ProfileComparison, ...]:
+    """Compare cached analysis profiles without rerunning Stockfish."""
+    grouped: dict[str, list[float]] = {}
+    for profile, accuracy in records:
+        clean = profile.strip()
+        if clean:
+            grouped.setdefault(clean, []).append(float(accuracy))
+    return tuple(
+        ProfileComparison(profile, len(values), sum(values) / len(values))
+        for profile, values in sorted(grouped.items())
+    )
+
+
+@dataclass(frozen=True)
 class LearningInsights:
     games: int
     opening_stats: tuple[OpeningStatistic, ...]
