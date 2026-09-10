@@ -47,7 +47,7 @@ def test_sandbox_engine_analysis_is_concise_and_position_scoped(app: QApplicatio
 
     dialog.fen.setText("8/8/8/8/8/8/4K3/7k w - - 0 1")
     dialog.load_position()
-    assert dialog.analyze_button.isEnabled()
+    assert not dialog.analyze_button.isEnabled()
     dialog.analyze_position()
     assert "terminal" in dialog.status.text().lower()
     dialog.close()
