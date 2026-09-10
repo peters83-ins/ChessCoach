@@ -18,6 +18,21 @@ jobs:
           python-version: "3.12"
       - name: Install build dependencies
         run: python -m pip install --upgrade pip && pip install ".[dev,build]"
+      - name: Install pinned Stockfish for real tests
+        shell: pwsh
+        run: |
+          $url = "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-windows-x86-64-universal.zip"
+          $expected = "3c8bf1f9ea66a09350a40df4f632288285ac206d99f33ab5842c408fc30b48a7"
+          $archive = Join-Path $env:RUNNER_TEMP "stockfish.zip"
+          $folder = Join-Path $env:RUNNER_TEMP "stockfish"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) {
+            throw "Stockfish checksum verification failed"
+          }
+          Expand-Archive -Path $archive -DestinationPath $folder -Force
+          $engine = Get-ChildItem $folder -Filter stockfish.exe -Recurse | Select-Object -First 1
+          if ($null -eq $engine) { throw "Stockfish executable was not found in the archive" }
+          "CHESSCOACH_TEST_STOCKFISH=$($engine.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Run tests
         env:
           QT_QPA_PLATFORM: offscreen

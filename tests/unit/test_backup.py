@@ -1,4 +1,5 @@
 import sqlite3
+import zipfile
 
 import pytest
 
@@ -49,3 +50,11 @@ def test_backup_supports_application_shared_database_path(tmp_path):
     restore_backup(archive, restored, restored)
     with sqlite3.connect(restored) as connection:
         assert connection.execute("SELECT value FROM marker").fetchone() == ("shared",)
+
+
+def test_restore_rejects_unsafe_archive_path(tmp_path):
+    archive = tmp_path / "unsafe.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("../games.sqlite3", b"not a database")
+    with pytest.raises(BackupError, match="unsafe path"):
+        restore_backup(archive, tmp_path / "games.sqlite3", tmp_path / "coach.sqlite3")

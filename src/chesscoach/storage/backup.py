@@ -1,9 +1,10 @@
 """Portable, atomic backup and restore for local Chess Coach databases."""
 
+import os
 import sqlite3
 import zipfile
 from contextlib import closing
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 class BackupError(ValueError):
@@ -50,6 +51,11 @@ def restore_backup(
     try:
         with zipfile.ZipFile(archive_path) as archive:
             names = set(archive.namelist())
+            if any(
+                PurePosixPath(name).is_absolute() or ".." in PurePosixPath(name).parts
+                for name in names
+            ):
+                raise BackupError("Backup contains an unsafe path.")
             if "games.sqlite3" not in names or (
                 "coach.sqlite3" not in names and game_database.resolve() != coach_database.resolve()
             ):
@@ -63,9 +69,9 @@ def restore_backup(
         _validate_database(restored_coach)
         game_database.parent.mkdir(parents=True, exist_ok=True)
         coach_database.parent.mkdir(parents=True, exist_ok=True)
-        restored_games.replace(game_database)
+        os.replace(restored_games, game_database)
         if coach_database.resolve() != game_database.resolve():
-            restored_coach.replace(coach_database)
+            os.replace(restored_coach, coach_database)
     except (OSError, zipfile.BadZipFile) as error:
         raise BackupError(f"Could not restore backup: {error}") from error
     finally:
