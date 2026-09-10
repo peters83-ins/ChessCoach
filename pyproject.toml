@@ -26,6 +26,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = ["real_stockfish: tests that launch an installed Stockfish executable"]
 
 [tool.coverage.run]
 source = ["chesscoach"]

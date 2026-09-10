@@ -141,9 +141,16 @@ python -m ruff format --check .
 python -m mypy src/chesscoach
 ```
 
-The suite uses real offscreen Qt widgets and deterministic engine doubles. To also
-run real Stockfish process/GUI tests, set `CHESSCOACH_TEST_STOCKFISH` to your local
-executable before running pytest. Those tests skip when the variable is unset.
+The suite uses real offscreen Qt widgets and deterministic engine doubles. The real
+Stockfish process/GUI tests are required and resolve `CHESSCOACH_TEST_STOCKFISH`,
+`STOCKFISH_PATH`, or the normal app engine-discovery locations. Configure one of
+these paths before running pytest; a missing executable fails the tests with a setup
+message instead of silently producing a green run.
+
+```powershell
+$env:CHESSCOACH_TEST_STOCKFISH = "C:\path\to\stockfish.exe"
+python -m pytest -q tests/integration/test_real_stockfish.py
+```
 
 Linux development requires a separate Linux virtual environment and Qt system
 libraries; do not reuse a Windows `.venv`. VS Code: select the project's Python
