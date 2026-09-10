@@ -61,6 +61,24 @@ class LearningHomeDialog(QDialog):
         self.practice_due.setEnabled(practice.due > 0 or bool(due_courses))
         self.review_latest.setEnabled(bool(games))
         self.weakest.setEnabled(bool(weaknesses))
+        self.continue_course.setToolTip(
+            "Resume the next due decision or saved course module."
+            if course_available
+            else "No offline courses are installed."
+        )
+        self.practice_due.setToolTip(
+            "Practice due decisions from games and courses."
+            if self.practice_due.isEnabled()
+            else "No practice is due yet."
+        )
+        self.review_latest.setToolTip(
+            "Review the latest saved game." if games else "Save or import a game first."
+        )
+        self.weakest.setToolTip(
+            "Practice your most frequent theme."
+            if weaknesses
+            else "Analyze a game to identify a learning theme."
+        )
         if practice.due or due_courses:
             self.recommendation.setText(
                 "Practice is due. A short local session will reinforce your current decisions."

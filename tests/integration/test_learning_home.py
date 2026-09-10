@@ -19,6 +19,7 @@ def test_learning_home_empty_state_and_course_action(app: QApplication, tmp_path
     dialog.action_requested.connect(chosen.append)
     dialog.continue_course.click()
     assert chosen == ["course:italian-game-white"]
+    assert "Resume" in dialog.continue_course.toolTip()
 
 
 def test_learning_home_routes_to_first_due_course_decision(

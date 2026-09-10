@@ -42,3 +42,11 @@ def test_orientation_overlay_and_click_through(app: QApplication) -> None:
     widget.set_attacks_visible(False)
     assert not widget.overlay.isVisible()
     widget.close()
+
+
+def test_board_preserves_square_as_width_changes(app: QApplication) -> None:
+    widget = ChessBoard(Game())
+    assert widget.hasHeightForWidth()
+    assert widget.heightForWidth(420) == 420
+    assert widget.squares[chess.E2].accessibleDescription()
+    widget.close()

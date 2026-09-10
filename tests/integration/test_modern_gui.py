@@ -14,3 +14,23 @@ def test_modern_theme_is_applied_to_primary_actions(app: QApplication, tmp_path:
     assert window.save_button.objectName() == "primaryAction"
     assert window.setup.start_button.objectName() == "primaryAction"
     window.close()
+
+
+def test_play_controls_have_predictable_keyboard_order_and_disabled_help(
+    app: QApplication, tmp_path: Path
+) -> None:
+    window = MainWindow(database=GameDatabase(tmp_path / "games.sqlite3"))
+    focus_chain = []
+    current = window.setup.mode
+    for _ in range(20):
+        focus_chain.append(current)
+        current = current.nextInFocusChain()
+        if current is window.setup.start_button:
+            focus_chain.append(current)
+            break
+    assert focus_chain.index(window.setup.mode) < focus_chain.index(window.setup.color)
+    assert focus_chain.index(window.setup.color) < focus_chain.index(window.setup.difficulty)
+    assert focus_chain.index(window.setup.difficulty) < focus_chain.index(window.setup.start_button)
+    assert window.undo_button.toolTip() == "Undo is available during an active game."
+    assert window.save_button.toolTip() == "Make at least one move before saving the match."
+    window.close()

@@ -1,7 +1,7 @@
 """Lightweight clickable whole-game evaluation graph."""
 
 from PySide6.QtCore import QPointF, Qt, Signal
-from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen, QPolygonF
+from PySide6.QtGui import QColor, QKeyEvent, QMouseEvent, QPainter, QPaintEvent, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
 
 from chesscoach.coach.models import MoveAnalysis
@@ -17,7 +17,11 @@ class EvaluationGraph(QWidget):
         self.critical: frozenset[int] = frozenset()
         self.selected = 0
         self.setMinimumHeight(90)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAccessibleName("Whole-game evaluation graph")
+        self.setAccessibleDescription(
+            "Use Left and Right to move through plies. Home and End jump to the game boundaries."
+        )
         self.setToolTip("Click the graph to jump to a move. Higher positions favor White.")
 
     def set_moves(self, moves: tuple[MoveAnalysis, ...], critical: tuple[int, ...]) -> None:
@@ -41,6 +45,23 @@ class EvaluationGraph(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.index_selected.emit(self.index_at_x(event.position().x()))
         super().mousePressEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        key = event.key()
+        if key in (Qt.Key.Key_Left, Qt.Key.Key_Down):
+            self.index_selected.emit(max(0, self.selected - 1))
+            event.accept()
+        elif key in (Qt.Key.Key_Right, Qt.Key.Key_Up):
+            self.index_selected.emit(min(len(self.values) - 1, self.selected + 1))
+            event.accept()
+        elif key == Qt.Key.Key_Home:
+            self.index_selected.emit(0)
+            event.accept()
+        elif key == Qt.Key.Key_End:
+            self.index_selected.emit(len(self.values) - 1)
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         del event

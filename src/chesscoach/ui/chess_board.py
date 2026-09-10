@@ -83,6 +83,12 @@ class ChessBoard(QWidget):
             self.file_labels[index].setText(chess.FILE_NAMES[index if color else 7 - index])
         self.clear_selection()
 
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return max(0, width)
+
     def set_attacks_visible(self, visible: bool) -> None:
         self.overlay.setGeometry(self.rect())
         self.classification_badge.move(max(0, self.width() - 94), 6)

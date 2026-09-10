@@ -10,6 +10,10 @@ QPushButton { background: #ffffff; color: #24324a; border: 1px solid #c9d3e3;
               border-radius: 8px; padding: 8px 14px; min-height: 18px; }
 QPushButton:hover { background: #edf3ff; border-color: #6b86d9; }
 QPushButton:pressed { background: #dce7ff; }
+QPushButton:focus, QToolButton:focus, QCheckBox:focus, QSlider:focus {
+    border: 2px solid #305da8;
+    outline: none;
+}
 QPushButton:disabled { color: #9aa6b8; background: #e9edf3; border-color: #d8dee8; }
 QPushButton#primaryAction { background: #4568d4; color: #ffffff; border-color: #4568d4;
                             font-weight: 700; }

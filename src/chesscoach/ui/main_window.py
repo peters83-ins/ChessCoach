@@ -270,6 +270,7 @@ class MainWindow(QMainWindow):
         self.diagnostics_button.clicked.connect(self.open_diagnostics)
         self.board.game_changed.connect(self.position_changed)
         self.board.message.connect(self.show_board_message)
+        self._set_tab_order()
         self.play_action.triggered.connect(self.new_game)
         self.games_action.triggered.connect(self.load_saved_game)
         self.review_action.triggered.connect(self.open_review_destination)
@@ -282,6 +283,30 @@ class MainWindow(QMainWindow):
         self.back_action.triggered.connect(self.show_play_workspace)
         self.apply_preferences(self.preferences)
         self.refresh()
+
+    def _set_tab_order(self) -> None:
+        """Keep the primary play flow predictable for keyboard users."""
+        controls = (
+            self.setup.mode,
+            self.setup.color,
+            self.setup.difficulty,
+            self.setup.engine_path,
+            self.setup.browse,
+            self.setup.start_button,
+            self.attack_toggle,
+            self.new_game_button,
+            self.undo_button,
+            self.claim_draw_button,
+            self.copy_pgn_button,
+            self.save_button,
+            self.load_button,
+            self.retry_button,
+            self.review_game_button,
+            self.settings_button,
+            self.diagnostics_button,
+        )
+        for first, second in zip(controls[:-1], controls[1:], strict=True):
+            QWidget.setTabOrder(first, second)
 
     def show_board_message(self, message: str) -> None:
         self.statusBar().showMessage(message)
@@ -394,6 +419,26 @@ class MainWindow(QMainWindow):
         )
         self.review_game_button.setVisible(
             self.match is not None and status.game_over and bool(self.game.history())
+        )
+        self.undo_button.setToolTip(
+            "Undo the last move."
+            if self.undo_button.isEnabled()
+            else "Undo is available during an active game."
+        )
+        self.claim_draw_button.setToolTip(
+            "Claim a legal draw."
+            if self.claim_draw_button.isEnabled()
+            else "A draw can be claimed only when the position qualifies."
+        )
+        self.save_button.setToolTip(
+            str(self.database.path)
+            if self.save_button.isEnabled()
+            else "Make at least one move before saving the match."
+        )
+        self.load_button.setToolTip(
+            "Open a saved game."
+            if self.load_button.isEnabled()
+            else "Finish or leave the active match before loading."
         )
         self.board.refresh()
 

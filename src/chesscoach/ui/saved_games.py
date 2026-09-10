@@ -165,6 +165,19 @@ class SavedGamesDialog(QDialog):
         self.open_button.setEnabled(enabled)
         self.export_button.setEnabled(enabled and self.export_game is not None)
         self.delete_button.setEnabled(enabled and self.delete_game is not None)
+        self.open_button.setToolTip(
+            "Open the selected saved game." if enabled else "No saved game matches the filters."
+        )
+        self.export_button.setToolTip(
+            "Export the selected game as PGN."
+            if self.export_button.isEnabled()
+            else "Select a saved game before exporting."
+        )
+        self.delete_button.setToolTip(
+            "Delete the selected saved game."
+            if self.delete_button.isEnabled()
+            else "Select a saved game before deleting."
+        )
 
     def selected_game_id(self) -> str | None:
         row = self.table.currentRow()

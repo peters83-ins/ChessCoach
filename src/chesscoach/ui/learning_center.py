@@ -271,6 +271,11 @@ class PracticeQueueDialog(QDialog):
         if self._daily:
             self.table.selectRow(0)
         self.start_button.setEnabled(bool(self._daily))
+        self.start_button.setToolTip(
+            "Start the selected practice item."
+            if self._daily
+            else "No items match the selected filters."
+        )
 
     def _start(self) -> None:
         selected = self.table.item(self.table.currentRow(), 0)

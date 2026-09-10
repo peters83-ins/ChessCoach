@@ -23,6 +23,7 @@ class GameReview(QWidget):
         self.graph.index_selected.connect(self.index_changed.emit)
         layout.addWidget(self.graph)
         self.next_key_button = QPushButton("Next Key Moment")
+        self.next_key_button.setAccessibleName("Go to next key moment")
         self.next_key_button.clicked.connect(self._next_key)
         self.next_key_button.setEnabled(False)
         layout.addWidget(self.next_key_button)
@@ -31,12 +32,23 @@ class GameReview(QWidget):
         self.previous_button = QPushButton("◀")
         self.next_button = QPushButton("▶")
         self.end_button = QPushButton("▶|")
+        for button, name in (
+            (self.start_button, "Go to review start"),
+            (self.previous_button, "Previous review position"),
+            (self.next_button, "Next review position"),
+            (self.end_button, "Go to review end"),
+        ):
+            button.setAccessibleName(name)
         for column, button in enumerate(
             (self.start_button, self.previous_button, self.next_button, self.end_button)
         ):
             controls.addWidget(button, 0, column)
         layout.addLayout(controls)
         self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setAccessibleName("Review position")
+        self.slider.setAccessibleDescription(
+            "Select a position from the start to the end of the game"
+        )
         self.slider.setMinimum(0)
         layout.addWidget(self.slider)
         self.position_label = QLabel("Start")
@@ -55,6 +67,9 @@ class GameReview(QWidget):
         self.show_line_button = QPushButton("Show Best Line")
         self.retry_move_button = QPushButton("Retry Move")
         self.hint_button = QPushButton("Hint")
+        self.show_line_button.setAccessibleName("Show engine best line")
+        self.retry_move_button.setAccessibleName("Retry current move")
+        self.hint_button.setAccessibleName("Show retry hint")
         self.hint_button.hide()
         actions.addWidget(self.show_line_button, 0, 0)
         actions.addWidget(self.retry_move_button, 0, 1)
