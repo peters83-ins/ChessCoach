@@ -4,13 +4,15 @@ import json
 import sqlite3
 from contextlib import closing
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 import chess
 
 from chesscoach.chess.game import Game
 from chesscoach.chess.openings import recognize_opening
-from chesscoach.chess.pgn import export_pgn
+from chesscoach.chess.pgn import export_pgn, parse_pgn_games
 
 
 @dataclass(frozen=True)
@@ -231,6 +233,32 @@ class GameDatabase:
         except (OSError, sqlite3.Error, ValueError) as error:
             return SaveResult(False, error=str(error))
         return SaveResult(True, game_id=game_data.id)
+
+    def import_pgn(
+        self, text: str, *, player_color: chess.Color = chess.WHITE, bot_elo: int = 1400
+    ) -> tuple[SaveResult, ...]:
+        """Import every legal game in a PGN document as a new saved record."""
+        try:
+            games = parse_pgn_games(text)
+        except ValueError as error:
+            return (SaveResult(False, error=str(error)),)
+        if not games:
+            return (SaveResult(False, error="PGN did not contain a game."),)
+        results: list[SaveResult] = []
+        for game in games:
+            now = datetime.now(UTC).isoformat()
+            data = GameData.from_game(
+                game,
+                match_id=str(uuid4()),
+                started_at=now,
+                saved_at=now,
+                ended_at=now if game.status().game_over else None,
+                player_color=player_color,
+                bot_elo=bot_elo,
+                move_timestamps=tuple(now for _ in game.history()),
+            )
+            results.append(self.save_game(data))
+        return tuple(results)
 
     def delete_game(self, game_id: str) -> bool:
         """Delete a game and its move rows from the database that contains it."""

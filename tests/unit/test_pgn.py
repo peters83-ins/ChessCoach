@@ -2,7 +2,13 @@ import chess
 import pytest
 
 from chesscoach.chess.game import Game
-from chesscoach.chess.pgn import export_pgn, parse_pgn, san_variation
+from chesscoach.chess.pgn import (
+    export_pgn,
+    export_pgn_games,
+    parse_pgn,
+    parse_pgn_games,
+    san_variation,
+)
 
 
 def test_pgn_roundtrip() -> None:
@@ -33,6 +39,15 @@ def test_export_results() -> None:
     game = Game("7k/8/8/8/8/8/8/KR6 w - - 100 51")
     game.claim_draw()
     assert '[Result "1/2-1/2"]' in export_pgn(game)
+
+
+def test_parse_and_export_multiple_games() -> None:
+    text = '[Result "*"]\n\n1. e4 *\n\n[Result "*"]\n\n1. d4 *'
+    games = parse_pgn_games(text)
+    assert len(games) == 2
+    exported = export_pgn_games(games)
+    assert exported.count('[Result "*"]') == 2
+    assert len(parse_pgn_games(exported)) == 2
 
 
 @pytest.mark.parametrize("text", ["", "1. e4 e5 2. Bh6 *", '[Variant "Atomic"]\n\n*'])

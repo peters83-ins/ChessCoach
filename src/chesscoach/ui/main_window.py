@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QDialog,
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -26,7 +27,7 @@ from PySide6.QtWidgets import (
 
 from chesscoach import __version__
 from chesscoach.chess.game import Game
-from chesscoach.chess.pgn import export_pgn, san_variation
+from chesscoach.chess.pgn import export_pgn, export_pgn_games, parse_pgn, san_variation
 from chesscoach.chess.review import ReviewSession
 from chesscoach.coach.models import AnalysisProgress, CoachBundle, MoveAnalysis
 from chesscoach.coach.pipeline import CoachPipeline
@@ -238,6 +239,7 @@ class MainWindow(QMainWindow):
         self.save_button = QPushButton("Save Match")
         self.save_button.setToolTip(str(self.database.path))
         self.load_button = QPushButton("Load Saved Game")
+        self.import_pgn_button = QPushButton("Import PGN…")
         self.retry_button = QPushButton("Retry Engine")
         self.review_game_button = QPushButton("Review Game")
         self.review_game_button.hide()
@@ -252,6 +254,7 @@ class MainWindow(QMainWindow):
             self.copy_pgn_button,
             self.save_button,
             self.load_button,
+            self.import_pgn_button,
             self.retry_button,
             self.review_game_button,
             self.settings_button,
@@ -264,6 +267,7 @@ class MainWindow(QMainWindow):
         self.copy_pgn_button.clicked.connect(self.copy_pgn)
         self.save_button.clicked.connect(self.save_match)
         self.load_button.clicked.connect(self.load_saved_game)
+        self.import_pgn_button.clicked.connect(self.import_pgn)
         self.retry_button.clicked.connect(self.retry_engine)
         self.review_game_button.clicked.connect(self.review_current_game)
         self.settings_button.clicked.connect(self.open_settings)
@@ -300,6 +304,7 @@ class MainWindow(QMainWindow):
             self.copy_pgn_button,
             self.save_button,
             self.load_button,
+            self.import_pgn_button,
             self.retry_button,
             self.review_game_button,
             self.settings_button,
@@ -654,6 +659,7 @@ class MainWindow(QMainWindow):
             self,
             delete_game=self.delete_saved_game,
             export_game=self.export_saved_game,
+            export_all_games=self.export_all_saved_games,
         )
         dialog.accepted.connect(lambda: self._load_selected_saved_game(dialog))
         return dialog
@@ -671,6 +677,41 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Load failed: game no longer exists.")
             return
         self.open_review(data)
+
+    def import_pgn(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Import PGN", "", "PGN (*.pgn *.txt)")
+        if not path:
+            return
+        try:
+            text = Path(path).read_text(encoding="utf-8")
+            results = self.database.import_pgn(text)
+        except (OSError, UnicodeError, ValueError) as error:
+            self.statusBar().showMessage(f"Import failed: {error}")
+            return
+        imported = sum(result.success for result in results)
+        failures = tuple(result.error for result in results if not result.success and result.error)
+        if imported:
+            message = f"Imported {imported} game(s)."
+            if failures:
+                message += f" {len(failures)} game(s) failed."
+        else:
+            message = f"Import failed: {failures[0] if failures else 'no games found'}"
+        self.statusBar().showMessage(message)
+
+    def export_all_saved_games(self, path: Path) -> bool:
+        try:
+            games = []
+            for summary in self.database.list_games():
+                data = self.database.load_game(summary.id)
+                if data is not None:
+                    games.append(parse_pgn(data.pgn))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(export_pgn_games(games), encoding="utf-8")
+        except (OSError, UnicodeError, ValueError, sqlite3.Error) as error:
+            self.statusBar().showMessage(f"Export failed: {error}")
+            return False
+        self.statusBar().showMessage(f"Exported {len(games)} game(s).")
+        return True
 
     def open_review_destination(self) -> None:
         if self.review is not None:

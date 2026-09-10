@@ -33,11 +33,13 @@ class SavedGamesDialog(QDialog):
         *,
         delete_game: Callable[[str], bool] | None = None,
         export_game: Callable[[str, Path], bool] | None = None,
+        export_all_games: Callable[[Path], bool] | None = None,
     ) -> None:
         super().__init__(parent)
         self.games = games
         self.delete_game = delete_game
         self.export_game = export_game
+        self.export_all_games = export_all_games
         self.setWindowTitle("Games")
         self.resize(980, 520)
         layout = QVBoxLayout(self)
@@ -81,8 +83,10 @@ class SavedGamesDialog(QDialog):
         layout.addWidget(self.table)
         actions = QHBoxLayout()
         self.export_button = QPushButton("Export PGN…")
+        self.export_all_button = QPushButton("Export All…")
         self.delete_button = QPushButton("Delete…")
         actions.addWidget(self.export_button)
+        actions.addWidget(self.export_all_button)
         actions.addWidget(self.delete_button)
         layout.addLayout(actions)
         buttons = QDialogButtonBox(
@@ -100,6 +104,7 @@ class SavedGamesDialog(QDialog):
         self.analysis_filter.currentIndexChanged.connect(self.refresh)
         self.sort_order.currentIndexChanged.connect(self.refresh)
         self.export_button.clicked.connect(self._export)
+        self.export_all_button.clicked.connect(self._export_all)
         self.delete_button.clicked.connect(self._delete)
         self.refresh()
 
@@ -164,6 +169,7 @@ class SavedGamesDialog(QDialog):
         enabled = bool(games)
         self.open_button.setEnabled(enabled)
         self.export_button.setEnabled(enabled and self.export_game is not None)
+        self.export_all_button.setEnabled(enabled and self.export_all_games is not None)
         self.delete_button.setEnabled(enabled and self.delete_game is not None)
         self.open_button.setToolTip(
             "Open the selected saved game." if enabled else "No saved game matches the filters."
@@ -172,6 +178,11 @@ class SavedGamesDialog(QDialog):
             "Export the selected game as PGN."
             if self.export_button.isEnabled()
             else "Select a saved game before exporting."
+        )
+        self.export_all_button.setToolTip(
+            "Export all saved games as one PGN file."
+            if self.export_all_button.isEnabled()
+            else "Save at least one game before exporting all games."
         )
         self.delete_button.setToolTip(
             "Delete the selected saved game."
@@ -193,6 +204,13 @@ class SavedGamesDialog(QDialog):
         path, _ = QFileDialog.getSaveFileName(self, "Export PGN", "game.pgn", "PGN (*.pgn)")
         if path:
             self.export_game(game_id, Path(path))
+
+    def _export_all(self) -> None:
+        if self.export_all_games is None or not self.games:
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Export all games", "games.pgn", "PGN (*.pgn)")
+        if path:
+            self.export_all_games(Path(path))
 
     def _delete(self) -> None:
         game_id = self.selected_game_id()

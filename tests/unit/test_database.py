@@ -81,6 +81,21 @@ def test_missing_move_timestamps_rejected() -> None:
         )
 
 
+def test_import_pgn_saves_every_game(tmp_path: Path) -> None:
+    database = GameDatabase(tmp_path / "games.sqlite3")
+    results = database.import_pgn('[Result "*"]\n\n1. e4 *\n\n[Result "*"]\n\n1. d4 *')
+    assert len(results) == 2
+    assert all(result.success and result.game_id for result in results)
+    assert len(database.list_games()) == 2
+
+
+def test_import_pgn_rejects_invalid_document(tmp_path: Path) -> None:
+    results = GameDatabase(tmp_path / "games.sqlite3").import_pgn("not a game")
+    assert len(results) == 1
+    assert not results[0].success
+    assert results[0].error
+
+
 @pytest.mark.parametrize(
     ("change", "error"),
     [

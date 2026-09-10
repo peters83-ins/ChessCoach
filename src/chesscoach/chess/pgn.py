@@ -21,16 +21,40 @@ def parse_pgn(text: str) -> Game:
     Comments, variations, and headers are not retained. Recorded resignations and
     agreed draws do not end the reconstructed playable position.
     """
-    record = chess.pgn.read_game(io.StringIO(text))
-    if record is None or record.errors:
+    games = parse_pgn_games(text)
+    if not games:
         raise ValueError("PGN is empty or contains invalid moves.")
-    if record.headers.get("Variant", "Standard").lower() not in ("standard", "chess", "normal"):
-        raise ValueError("Only standard chess PGN is supported.")
-    game = Game(record.board().fen())
-    for move in record.mainline_moves():
-        if not game.attempt_move(move):
-            raise ValueError("PGN contains an illegal move or continues after game over.")
-    return game
+    return games[0]
+
+
+def parse_pgn_games(text: str) -> tuple[Game, ...]:
+    """Parse every standard mainline game in a PGN document."""
+    stream = io.StringIO(text)
+    games: list[Game] = []
+    while record := chess.pgn.read_game(stream):
+        if record.errors:
+            raise ValueError("PGN contains invalid moves.")
+        if record.headers.get("Variant", "Standard").lower() not in (
+            "standard",
+            "chess",
+            "normal",
+        ):
+            raise ValueError("Only standard chess PGN is supported.")
+        game = Game(record.board().fen())
+        move_count = 0
+        for move in record.mainline_moves():
+            if not game.attempt_move(move):
+                raise ValueError("PGN contains an illegal move or continues after game over.")
+            move_count += 1
+        if move_count == 0:
+            raise ValueError("PGN game contains no moves.")
+        games.append(game)
+    return tuple(games)
+
+
+def export_pgn_games(games: Iterable[Game]) -> str:
+    """Export multiple games separated by the standard PGN blank line."""
+    return "\n\n".join(export_pgn(game).rstrip() for game in games)
 
 
 def san_variation(fen: str, moves: Iterable[str]) -> str:
