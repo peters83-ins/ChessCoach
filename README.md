@@ -3,6 +3,14 @@
 Python 3.12+ / PySide6 desktop chess with local Stockfish play and SQLite match
 saving. No OpenAI credentials or network connection are needed during play.
 
+## Downloadable Windows builds
+
+Tagged releases publish a signed installer and a portable ZIP through [GitHub Releases](https://github.com/peters83-ins/ChessCoach/releases). The installer places application files under Program Files while user data remains in `%LOCALAPPDATA%\ChessCoach`; uninstalling does not remove saved games. The portable ZIP can run from a writable folder and keeps data beside the application when possible. Verify the matching SHA-256 value from `SHA256SUMS.txt` before installing.
+
+The repository also contains the reproducible [PyInstaller spec](packaging/chesscoach.spec),
+the [Inno Setup script](packaging/ChessCoach.iss), and the [Windows release workflow](.github/workflows/windows-build.yml).
+
+
 ## Run on Windows
 
 From the repository directory in PowerShell, use the existing virtual environment:
