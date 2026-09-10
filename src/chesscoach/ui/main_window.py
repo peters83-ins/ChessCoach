@@ -1189,8 +1189,7 @@ class MainWindow(QMainWindow):
         )
 
     def show_play_workspace(self) -> None:
-        self.navigator.set_initial(Destination.PLAY)
-        self.workspace_stack.setCurrentIndex(0)
+        self.navigator.show_primary(Destination.PLAY)
         self.statusBar().showMessage("Play workspace", 2000)
 
     def navigate_back(self) -> None:

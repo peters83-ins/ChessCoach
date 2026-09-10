@@ -34,3 +34,15 @@ def test_navigator_reuses_pages_and_supports_bounded_back_stack(app):
 def test_navigator_rejects_invalid_history_limit(app):
     with pytest.raises(ValueError):
         WorkspaceNavigator(QStackedWidget(), history_limit=0)
+
+
+def test_primary_page_preserves_history_when_returning_to_play(app):
+    stack = QStackedWidget()
+    stack.addWidget(QLabel("play"))
+    navigator = WorkspaceNavigator(stack)
+    navigator.set_initial(Destination.PLAY)
+    navigator.show(Destination.COURSES, lambda: QLabel("courses"))
+    navigator.show_primary(Destination.PLAY)
+    assert navigator.current == Destination.PLAY
+    assert navigator.history == (Destination.PLAY.value, Destination.COURSES.value)
+    assert navigator.back() == Destination.COURSES.value

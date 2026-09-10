@@ -49,6 +49,16 @@ class WorkspaceNavigator:
         """Declare the already-installed landing page without adding history."""
         self._current = destination.value if isinstance(destination, Destination) else destination
 
+    def show_primary(self, destination: Destination | str, index: int = 0) -> None:
+        """Show a primary stacked page while retaining navigation history."""
+        key = destination.value if isinstance(destination, Destination) else destination
+        if self._current != key and not self._moving_back:
+            if self._current is not None:
+                self._history.append(self._current)
+            self._forward.clear()
+        self._current = key
+        self.stack.setCurrentIndex(index)
+
     def show(self, destination: Destination | str, factory: Callable[[], QWidget]) -> QWidget:
         key = destination.value if isinstance(destination, Destination) else destination
         page = self.pages.get(key)
