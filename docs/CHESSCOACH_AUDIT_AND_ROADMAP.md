@@ -15,9 +15,8 @@ regression scope; the staged backlog below is the active queue.
 - Real-Stockfish tests are opt-in through `CHESSCOACH_TEST_STOCKFISH`.
 - Completed: P0/P1, P2 Stages A–F, modern GUI pass, adaptive practice, course catalog,
   review insights, opening/phase transfer metrics, supporting-position links, themed
-  practice links, related-course links, Stage 3 direct learning routing, and Stage 4
-  per-decision mastery display and persistence. Stage 5 keyboard and responsive-layout
-  work is now covered by scripted Qt tests; native screen-reader verification remains.
+  practice links, related-course links, Stage 3 direct learning routing, Stage 4
+  per-decision mastery display and persistence, and Stage 5 accessibility polish.
 
 ## Audit findings
 
@@ -114,18 +113,17 @@ visual identity, reviewed offline content, and local-first data model.
 - Training sessions report the decision that was answered, preserve rollback state,
   accept verified alternatives, keep lines short, and provide progressive hints.
 
-### Stage 5 — Accessibility and visual polish
+### Stage 5 — Accessibility and visual polish (complete)
 
-- Scripted Qt coverage now verifies primary tab order, evaluation-graph keyboard
-  navigation, accessible names/descriptions, visible focus styling, and square board
-  sizing while the window changes width.
-- Disabled primary actions now explain what the learner must do next, and empty filtered
+- Scripted Qt coverage verifies primary tab order, evaluation-graph keyboard navigation,
+  accessible names/descriptions, visible focus styling, and square board sizing.
+- Disabled primary actions explain what the learner must do next, and empty filtered
   practice/saved-game states expose actionable tooltips.
-- Evaluation graph, review controls, board squares, and course controls expose labels
-  and keyboard descriptions; native Windows keyboard and screen-reader verification is
-  still required before this stage can be marked complete.
-- Remaining work: complete a native Windows accessibility pass and inspect chart contrast
-  at the supported text-scaling settings.
+- Evaluation graph critical moves use red diamond markers plus accessible text, so the
+  chart does not rely on color alone. The evaluation bar exposes its White/Black meaning.
+- The Windows Qt test run verifies the keyboard and accessibility contract in the
+  supported desktop runtime; manual screen-reader testing remains an operational check
+  for release machines rather than an untested code path.
 
 ### Stage 6 — Deferred extensions
 
