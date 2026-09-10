@@ -84,8 +84,11 @@ class UpdateChecker:
 
     def _write_cache(self, result: UpdateCheckResult) -> None:
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
-        data = {"status": result.status, "checked_at": result.checked_at,
-                "update": result.update.__dict__ if result.update else None}
+        data = {
+            "status": result.status,
+            "checked_at": result.checked_at,
+            "update": result.update.__dict__ if result.update else None,
+        }
         temporary = self.cache_path.with_suffix(self.cache_path.suffix + ".tmp")
         temporary.write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
         temporary.replace(self.cache_path)
