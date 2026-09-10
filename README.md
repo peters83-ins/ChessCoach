@@ -230,3 +230,157 @@ visibility, coaching detail, and Quick/Standard/Deep analysis depth.
 See [AI coach architecture](docs/AI_COACH.md) for scoring and extension contracts.
 The prioritized [first-pass product backlog](docs/FIRST_PASS_BACKLOG.md) is the working
 reference for onboarding, review navigation, practice, lessons, and release readiness.
+
+## Quick start for a laptop
+
+### Windows 10/11
+
+Install Python 3.12 or newer, clone this repository, and open PowerShell in the
+repository folder:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m chesscoach.main
+```
+
+If `.venv` already exists, only the last two commands are needed. To activate the
+environment for a session instead:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m chesscoach.main
+```
+
+If PowerShell blocks script activation, do not change the machine policy; use the
+direct `.venv\Scripts\python.exe` commands above.
+
+### Linux or WSL
+
+Use a Linux Python environment; do not run the Windows `.venv` from WSL:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y python3.12 python3.12-venv
+git clone <repository-url>
+cd ChessCoach
+PYTHON=python3.12 ./scripts/run_tests_wsl.sh --help
+```
+
+The test script creates `.venv-wsl`, installs the application, sets Qt to offscreen,
+and runs pytest. To launch the GUI from a Linux desktop session, activate that
+environment and run `python -m chesscoach.main`; WSL without a GUI server should use
+the offscreen test runner rather than launching the desktop window.
+
+## Installing Stockfish
+
+Stockfish is a separate local command-line engine. It is not a Python package, API
+key, or chess database. Download a current build from the
+[official Stockfish download page](https://stockfishchess.org/download/), extract it,
+and select the executable in the first-run guide or **Settings**.
+
+- Windows: select `stockfish.exe`. The app also searches
+  `%LOCALAPPDATA%\ChessCoach\engines\stockfish.exe` and `PATH`.
+- Linux/WSL: select the `stockfish` binary. The app searches
+  `~/.local/share/ChessCoach/engines/stockfish` and `PATH`.
+- The executable must be readable and runnable by the current user. If the app says
+  **Choose Stockfish first**, use **Browse** or set `STOCKFISH_PATH` in `.env`.
+
+Confirm an installation from a terminal before opening the app:
+
+```powershell
+& "C:\path\to\stockfish.exe"
+```
+
+```bash
+printf 'uci\nquit\n' | "$HOME/.local/share/ChessCoach/engines/stockfish"
+```
+
+Seeing an `id name Stockfish ...` response confirms the executable speaks UCI.
+Stockfish is authoritative for engine evaluations and moves; the optional language
+model only explains facts already verified by python-chess and Stockfish.
+
+## Using the application
+
+1. Start Chess Coach and complete the first-run guide. Choose an engine path, or
+   choose **Local two-player** if you want to play without Stockfish.
+2. On **Play**, choose your color and a difficulty. White moves from the bottom when
+   you play White; selecting Black flips the board and makes Stockfish move first.
+3. Click a piece to see legal destinations, then click a highlighted destination.
+   The board is locked while Stockfish calculates and while its configured presentation
+   delay is running.
+4. Use **Undo**, **Claim Draw**, **Save Match**, or **New Game** from the match action
+   bar. Completed bot matches save automatically; unfinished matches can be saved
+   explicitly.
+5. Choose **Games** to search, filter, load, delete, or export a saved match. Choose
+   **Review Game** after a completed match for the summary and analysis workflow.
+6. In **Review**, use **Next Key Moment**, the move list, graph, slider, or arrow keys.
+   **Show Best Line** displays a short legal continuation. **Retry Move** hides the
+   answer, accepts engine-verified alternatives, and returns to the reviewed position.
+7. Use **Practice**, **Lessons**, **Courses**, and **Learn** for short local exercises.
+   Practice records each decision separately and schedules future reviews.
+8. Use **Diagnostics** for the database path, engine path/version, analysis state, and
+   the latest sanitized error. Use **Settings** for preferences and optional OpenAI.
+
+## Optional OpenAI coaching
+
+Local play, review, analysis, courses, and practice work without an OpenAI account.
+For richer explanations, create an API key in the OpenAI API Platform and put it in
+the ignored repository `.env` file:
+
+```dotenv
+OPENAI_API_KEY=your_key_here
+OPENAI_MODEL=your_available_model_id
+```
+
+Never commit `.env` or paste the key into an issue, screenshot, or chat. Restart the
+application or use **Settings → Test OpenAI** after changing the file. OpenAI receives
+only selected critical positions, legal moves, engine lines, classifications, and
+evidence IDs. If the key is absent, invalid, rate-limited, or unavailable, deterministic
+local coaching remains active.
+
+## Data and privacy
+
+Games and coaching records are stored locally in SQLite. On Windows the default game
+database is `%LOCALAPPDATA%\Chess Coach\games\games.sqlite3`; on Linux it is under
+`$XDG_DATA_HOME/ChessCoach/games/games.sqlite3` or `~/.local/share/ChessCoach/games/`.
+The app creates the `games` directory automatically. Diagnostics redact configured
+secrets, and API keys are never stored in SQLite. Use **Backup Data** and **Restore
+Data** from **Tools** for local archives.
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `Choose Stockfish first` | Install/extract Stockfish and use **Browse**, or set `STOCKFISH_PATH`. |
+| Engine starts then fails | Run the executable directly and confirm it prints `id name` for `uci`. |
+| Pieces do not move | Click **Start Match** first; local preview highlights legal squares before a match. |
+| Bot appears unresponsive | Wait for the configured delay, then use **Retry Engine** if an error is shown. |
+| No saved games | Check the path shown below move history and use **Diagnostics** to copy it. |
+| OpenAI unavailable | Continue with local coaching; check `.env`, model name, billing, and network. |
+| WSL cannot launch `.venv\Scripts\python.exe` | Use `PYTHON=python3.12 ./scripts/run_tests_wsl.sh`; WSL needs a Linux environment. |
+| Qt display error in CI/WSL | Set `QT_QPA_PLATFORM=offscreen` and run the test script. |
+
+## Development and quality checks
+
+The repository requires Python 3.12+, typed public interfaces, deterministic fake
+engines for normal CI, and real Stockfish integration coverage when an executable is
+available. From Windows use `.venv\Scripts\python.exe`; from WSL use `.venv-wsl/bin/python`.
+
+```powershell
+\.venv\Scripts\python.exe -m pytest -q
+\.venv\Scripts\python.exe -m ruff check .
+\.venv\Scripts\python.exe -m mypy src/chesscoach
+```
+
+```bash
+PYTHON=python3.12 ./scripts/run_tests_wsl.sh
+.venv-wsl/bin/ruff check .
+.venv-wsl/bin/mypy src/chesscoach
+```
+
+The real Stockfish tests resolve `CHESSCOACH_TEST_STOCKFISH`, `STOCKFISH_PATH`, or
+normal engine discovery and fail clearly if no executable is installed. The current
+validated WSL baseline is 211 passing tests, including the real Stockfish matrix.
+Read [the canonical audit and roadmap](docs/CHESSCOACH_AUDIT_AND_ROADMAP.md) before
+starting a feature branch.
