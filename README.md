@@ -17,8 +17,8 @@ The release workflow runs on a semantic version tag whose value matches
 
 ```powershell
 git pull origin master
-git tag -a v0.1.0 -m "Chess Coach 0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.1 -m "Chess Coach 0.1.1"
+git push origin v0.1.1
 ```
 
 Running the workflow with **Run workflow** on a branch creates a downloadable
