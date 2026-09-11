@@ -39,7 +39,7 @@ jobs:
       - name: Run tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest -q
+        run: python scripts/run_ci_tests.py -q
       - name: Build executable
         run: pyinstaller --clean --noconfirm packaging/chesscoach.spec
       - name: Create portable archive
