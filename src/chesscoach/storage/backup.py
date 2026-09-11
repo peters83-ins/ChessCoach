@@ -1,6 +1,7 @@
 """Portable, atomic backup and restore for local Chess Coach databases."""
 
 import os
+import shutil
 import sqlite3
 import zipfile
 from contextlib import closing
@@ -9,6 +10,23 @@ from pathlib import Path, PurePosixPath
 
 class BackupError(ValueError):
     """Raised when a backup archive is missing or contains an invalid database."""
+
+
+def _replace_database(source: Path, destination: Path) -> None:
+    """Replace a database while tolerating Windows read-only attributes."""
+    try:
+        os.chmod(source, 0o666)
+        if destination.exists():
+            os.chmod(destination, 0o666)
+        os.replace(source, destination)
+    except OSError as replace_error:
+        try:
+            # Some Windows filesystem providers deny replace while allowing a
+            # normal writable copy after the read-only bit is cleared.
+            os.chmod(destination, 0o666)
+            shutil.copyfile(source, destination)
+        except OSError as copy_error:
+            raise BackupError(f"Could not replace database: {replace_error}") from copy_error
 
 
 def create_backup(game_database: Path, coach_database: Path, destination: Path) -> None:
@@ -69,9 +87,9 @@ def restore_backup(
         _validate_database(restored_coach)
         game_database.parent.mkdir(parents=True, exist_ok=True)
         coach_database.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(restored_games, game_database)
+        _replace_database(restored_games, game_database)
         if coach_database.resolve() != game_database.resolve():
-            os.replace(restored_coach, coach_database)
+            _replace_database(restored_coach, coach_database)
     except (OSError, zipfile.BadZipFile) as error:
         raise BackupError(f"Could not restore backup: {error}") from error
     finally:

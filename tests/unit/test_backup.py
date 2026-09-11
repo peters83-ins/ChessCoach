@@ -58,3 +58,25 @@ def test_restore_rejects_unsafe_archive_path(tmp_path):
         output.writestr("../games.sqlite3", b"not a database")
     with pytest.raises(BackupError, match="unsafe path"):
         restore_backup(archive, tmp_path / "games.sqlite3", tmp_path / "coach.sqlite3")
+
+
+def test_restore_falls_back_when_replace_is_denied(tmp_path, monkeypatch):
+    games = tmp_path / "games.sqlite3"
+    coach = tmp_path / "coach.sqlite3"
+    _db(games, "games")
+    _db(coach, "coach")
+    archive = tmp_path / "backup.zip"
+    create_backup(games, coach, archive)
+
+    import chesscoach.storage.backup as backup_module
+
+    original_replace = backup_module.os.replace
+
+    def deny_once(source, destination):
+        backup_module.os.replace = original_replace
+        raise PermissionError("simulated Windows denial")
+
+    monkeypatch.setattr(backup_module.os, "replace", deny_once)
+    restore_backup(archive, games, coach, overwrite=True)
+    with sqlite3.connect(games) as connection:
+        assert connection.execute("SELECT value FROM marker").fetchone() == ("games",)
