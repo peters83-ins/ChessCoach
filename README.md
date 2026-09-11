@@ -33,11 +33,32 @@ repository's **Actions** tab to monitor the job, then **Releases** to copy the
 installer or portable ZIP link. A failed tag run can be rerun safely; the release
 step updates an existing release's assets rather than creating duplicates.
 
-The current workflow publishes checksummed artifacts but does not have a code
-signing certificate configured. Windows SmartScreen may therefore show an
-unrecognized-publisher prompt. Verify `SHA256SUMS.txt` and only run an installer
-downloaded from the repository's GitHub Release. Code signing can be added later
-by storing the certificate and signing credentials in GitHub Actions secrets.
+The release workflow supports Authenticode signing. Without signing secrets,
+Windows SmartScreen may show an unrecognized-publisher or uncommon-download
+prompt. Verify `SHA256SUMS.txt` and only run an installer downloaded from the
+repository's GitHub Release. To sign releases, obtain a Windows code-signing
+certificate from a trusted certificate authority, export its private key as a
+password-protected PFX, then add these repository **Actions secrets**:
+
+```text
+WINDOWS_SIGNING_CERTIFICATE_BASE64
+WINDOWS_SIGNING_CERTIFICATE_PASSWORD
+```
+
+Create the first value locally without committing the certificate:
+
+```powershell
+[Convert]::ToBase64String(
+  [IO.File]::ReadAllBytes("C:\secure\chesscoach-signing.pfx")
+) | Set-Clipboard
+```
+
+Paste that value into the first secret and the PFX password into the second.
+Never put either value in chat, source control, workflow logs, or the release
+assets. Rerun the tagged workflow after configuring the secrets; it will replace
+the existing release assets with signed files. Extended-validation certificates
+usually build SmartScreen reputation faster, but even a signed new application
+may show a short-lived reputation prompt.
 
 
 ## Run on Windows
