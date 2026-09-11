@@ -1,12 +1,18 @@
 # PyInstaller build definition for the Windows desktop payload.
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_data_files
 
+
+PROJECT_ROOT = Path(SPEC).resolve().parent.parent
+SOURCE_ROOT = PROJECT_ROOT / "src"
+ENTRY_POINT = SOURCE_ROOT / "chesscoach" / "main.py"
 
 datas = collect_data_files("chesscoach", includes=["courses/content/*.json"])
 
 a = Analysis(
-    ["src/chesscoach/main.py"],
-    pathex=["src"],
+    [str(ENTRY_POINT)],
+    pathex=[str(SOURCE_ROOT)],
     binaries=[],
     datas=datas,
     hiddenimports=[],
