@@ -1,5 +1,5 @@
 ; Inno Setup script for the tagged Windows release.
-; Build with: iscc /DAppVersion=0.1.1 packaging/ChessCoach.iss
+; Build with: iscc /DAppVersion=0.1.2 packaging/ChessCoach.iss
 #ifndef AppVersion
 #define AppVersion "0.0.0-dev"
 #endif
