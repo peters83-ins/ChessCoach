@@ -11,8 +11,13 @@ from PySide6.QtWidgets import QApplication
 def app() -> Iterator[QApplication]:
     application = QApplication.instance() or QApplication([])
     assert isinstance(application, QApplication)
-    yield application
-    application.closeAllWindows()
+    try:
+        yield application
+    finally:
+        application.closeAllWindows()
+        application.processEvents()
+        application.quit()
+        application.processEvents()
 
 
 @pytest.fixture(autouse=True)
