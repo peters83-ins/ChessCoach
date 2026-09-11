@@ -37,6 +37,15 @@ def test_extract_requires_unique_executable(tmp_path: Path) -> None:
         extract_engine_archive(archive, tmp_path / "stockfish.exe")
 
 
+def test_extract_can_discover_stockfish_named_executable(tmp_path: Path) -> None:
+    archive = tmp_path / "stockfish.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("stockfish/stockfish-windows-x86-64-universal.exe", b"uci")
+    destination = tmp_path / "stockfish.exe"
+    extract_engine_archive(archive, destination, executable_name=None)
+    assert destination.read_bytes() == b"uci"
+
+
 def test_extract_rejects_oversized_executable(tmp_path: Path) -> None:
     archive = tmp_path / "stockfish.zip"
     with zipfile.ZipFile(archive, "w") as output:

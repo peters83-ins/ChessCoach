@@ -101,7 +101,7 @@ def extract_engine_archive(
     archive: Path,
     destination: Path,
     *,
-    executable_name: str = "stockfish.exe",
+    executable_name: str | None = "stockfish.exe",
     max_bytes: int = DEFAULT_MAX_ENGINE_BYTES,
     validator: Callable[[Path], None] | None = None,
 ) -> Path:
@@ -115,7 +115,12 @@ def extract_engine_archive(
             candidates = [
                 info
                 for info in source.infolist()
-                if not info.is_dir() and Path(info.filename).name.lower() == executable_name.lower()
+                if not info.is_dir()
+                and (
+                    Path(info.filename).name.lower() == executable_name.lower()
+                    if executable_name is not None
+                    else Path(info.filename).suffix.lower() == ".exe"
+                )
             ]
             if len(candidates) != 1:
                 raise EngineDownloadError("The Stockfish archive has no unique executable.")

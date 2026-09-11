@@ -30,7 +30,9 @@ jobs:
             throw "Stockfish checksum verification failed"
           }
           Expand-Archive -Path $archive -DestinationPath $folder -Force
-          $engine = Get-ChildItem $folder -Filter stockfish.exe -Recurse | Select-Object -First 1
+          $engine = Get-ChildItem $folder -Filter *.exe -Recurse |
+            Where-Object { $_.Name -like 'stockfish-*.exe' } |
+            Select-Object -First 1
           if ($null -eq $engine) { throw "Stockfish executable was not found in the archive" }
           "CHESSCOACH_TEST_STOCKFISH=$($engine.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Run tests
