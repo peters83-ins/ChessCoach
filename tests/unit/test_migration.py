@@ -38,8 +38,11 @@ def test_failed_migration_restores_original_databases(tmp_path: Path) -> None:
     database(coach, "coach")
 
     def fail() -> None:
-        with sqlite3.connect(games) as connection:
+        connection = sqlite3.connect(games)
+        try:
             connection.execute("UPDATE state SET value='broken'")
+        finally:
+            connection.close()
         raise ValueError("migration bug")
 
     with pytest.raises(MigrationError, match="restored"):
