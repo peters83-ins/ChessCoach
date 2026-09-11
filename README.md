@@ -21,6 +21,11 @@ git tag -a v0.1.0 -m "Chess Coach 0.1.0"
 git push origin v0.1.0
 ```
 
+Running the workflow with **Run workflow** on a branch creates a downloadable
+Actions artifact for testing, but it does not publish a Release. A Release is
+created only by the tag push above. Manual or branch runs show this distinction
+in the workflow summary.
+
 GitHub Actions runs the tests with the pinned Stockfish executable, builds the
 PyInstaller payload, creates the portable ZIP and Inno Setup installer, writes
 checksums and the update manifest, and publishes all release assets. Open the

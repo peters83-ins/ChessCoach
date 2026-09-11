@@ -99,6 +99,15 @@ jobs:
         with:
           name: chesscoach-windows-${{ github.run_number }}
           path: dist/**
+      - name: Explain manual build output
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        shell: pwsh
+        run: |
+          @"
+          This was an artifact-only build because the workflow ran from a branch or manual dispatch.
+          To publish a GitHub Release, push a matching semantic version tag such as v0.1.0.
+          Download the generated files from the Artifacts section of this run.
+          "@ | Set-Content $env:GITHUB_STEP_SUMMARY
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
