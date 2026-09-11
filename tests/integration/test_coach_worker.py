@@ -129,7 +129,10 @@ def test_coach_runner_cancels_without_error(
         CoachRepository(tmp_path / "coach.sqlite3"),
         Settings(),
     )
-    assert started.wait(1)
+    # Windows hosted runners can spend over a second creating the SQLite schema
+    # before the worker reaches the blocking service. Keep the synchronization
+    # bounded while allowing normal runner startup variance.
+    assert started.wait(5)
     runner.shutdown()
     app.processEvents()
     assert result.count() == error.count() == 0
