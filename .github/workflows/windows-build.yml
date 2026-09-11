@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   package:
@@ -19,6 +19,15 @@ jobs:
           python-version: "3.12"
       - name: Install build dependencies
         run: python -m pip install --upgrade pip && pip install ".[dev,build]"
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ github.ref_name }}".TrimStart('v')
+          $packageVersion = python -c "from chesscoach import __version__; print(__version__)"
+          if ($tagVersion -ne $packageVersion) {
+            throw "Tag version $tagVersion does not match package version $packageVersion"
+          }
       - name: Install pinned Stockfish for real tests
         shell: pwsh
         run: |
@@ -57,11 +66,57 @@ jobs:
       - name: Generate checksums
         shell: pwsh
         run: |
-          Get-ChildItem dist -Recurse -File | Get-FileHash -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLowerInvariant())  $($_.Path)" } |
+          $dist = (Resolve-Path dist).Path
+          Get-ChildItem dist -Recurse -File |
+            Where-Object { $_.Name -ne "SHA256SUMS.txt" -and $_.Name -ne "manifest.json" } |
+            Get-FileHash -Algorithm SHA256 |
+            ForEach-Object {
+              $relative = $_.Path.Substring($dist.Length + 1).Replace("\\", "/")
+              "$($_.Hash.ToLowerInvariant())  $relative"
+            } |
             Set-Content dist/SHA256SUMS.txt
+      - name: Create release manifest
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $installer = Get-ChildItem dist/installer -Filter *.exe | Select-Object -First 1
+          if ($null -eq $installer) { throw "Installer artifact was not found" }
+          $portable = Get-ChildItem dist -Filter "*-portable.zip" | Select-Object -First 1
+          if ($null -eq $portable) { throw "Portable artifact was not found" }
+          python scripts/create_release_manifest.py `
+            --version $version `
+            --repository "${{ github.repository }}" `
+            --tag "${{ github.ref_name }}" `
+            --installer $installer.FullName `
+            --portable $portable.FullName `
+            --output dist/manifest.json
+      - name: Include third-party notices
+        shell: pwsh
+        run: Copy-Item THIRD_PARTY.md dist/THIRD_PARTY.md
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
           name: chesscoach-windows-${{ github.run_number }}
           path: dist/**
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $assets = @(
+            (Get-ChildItem dist/installer -Filter *.exe).FullName,
+            (Get-ChildItem dist -Filter "*-portable.zip").FullName,
+            (Resolve-Path dist/SHA256SUMS.txt).Path,
+            (Resolve-Path dist/manifest.json).Path,
+            (Resolve-Path dist/THIRD_PARTY.md).Path
+          )
+          gh release view $tag --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag --repo "${{ github.repository }}" --clobber $assets
+          } else {
+            gh release create $tag --repo "${{ github.repository }}" --title "Chess Coach $tag" --generate-notes $assets
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

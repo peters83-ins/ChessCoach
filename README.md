@@ -5,10 +5,34 @@ saving. No OpenAI credentials or network connection are needed during play.
 
 ## Downloadable Windows builds
 
-Tagged releases publish a signed installer and a portable ZIP through [GitHub Releases](https://github.com/peters83-ins/ChessCoach/releases). The installer places application files under Program Files while user data remains in `%LOCALAPPDATA%\ChessCoach`; uninstalling does not remove saved games. The portable ZIP can run from a writable folder and keeps data beside the application when possible. Verify the matching SHA-256 value from `SHA256SUMS.txt` before installing.
+Tagged releases publish a Windows installer and a portable ZIP through [GitHub Releases](https://github.com/peters83-ins/ChessCoach/releases). The installer places application files under Program Files while user data remains in `%LOCALAPPDATA%\ChessCoach`; uninstalling does not remove saved games. The portable ZIP can run from a writable folder and keeps data beside the application when possible. Verify the matching SHA-256 value from `SHA256SUMS.txt` before installing. Releases also include `manifest.json`, which powers the in-app update checker, and `THIRD_PARTY.md` with license notices.
 
 The repository also contains the reproducible [PyInstaller spec](packaging/chesscoach.spec),
 the [Inno Setup script](packaging/ChessCoach.iss), and the [Windows release workflow](.github/workflows/windows-build.yml).
+
+### Publish a Windows release
+
+The release workflow runs on a semantic version tag whose value matches
+`src/chesscoach/__init__.py`. From a clean `master` checkout:
+
+```powershell
+git pull origin master
+git tag -a v0.1.0 -m "Chess Coach 0.1.0"
+git push origin v0.1.0
+```
+
+GitHub Actions runs the tests with the pinned Stockfish executable, builds the
+PyInstaller payload, creates the portable ZIP and Inno Setup installer, writes
+checksums and the update manifest, and publishes all release assets. Open the
+repository's **Actions** tab to monitor the job, then **Releases** to copy the
+installer or portable ZIP link. A failed tag run can be rerun safely; the release
+step updates an existing release's assets rather than creating duplicates.
+
+The current workflow publishes checksummed artifacts but does not have a code
+signing certificate configured. Windows SmartScreen may therefore show an
+unrecognized-publisher prompt. Verify `SHA256SUMS.txt` and only run an installer
+downloaded from the repository's GitHub Release. Code signing can be added later
+by storing the certificate and signing credentials in GitHub Actions secrets.
 
 
 ## Run on Windows
