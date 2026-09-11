@@ -5,7 +5,32 @@ saving. No OpenAI credentials or network connection are needed during play.
 
 ## Downloadable Windows builds
 
-Tagged releases publish a Windows installer and a portable ZIP through [GitHub Releases](https://github.com/peters83-ins/ChessCoach/releases). The installer places application files under Program Files while user data remains in `%LOCALAPPDATA%\ChessCoach`; uninstalling does not remove saved games. The portable ZIP can run from a writable folder and keeps data beside the application when possible. Verify the matching SHA-256 value from `SHA256SUMS.txt` before installing. Releases also include `manifest.json`, which powers the in-app update checker, and `THIRD_PARTY.md` with license notices.
+Tagged releases publish a Windows installer and a portable ZIP through [GitHub Releases](https://github.com/peters83-ins/ChessCoach/releases). The portable ZIP is the recommended first download: it needs no administrator access or installation and contains the complete application. The installer places application files under `Program Files`, creates Windows shortcuts, and registers an uninstaller. Both builds keep user data in `%LOCALAPPDATA%\ChessCoach`; uninstalling does not remove saved games. Verify the matching SHA-256 value from `SHA256SUMS.txt` before running either build. Releases also include `manifest.json`, which powers the in-app update checker, and `THIRD_PARTY.md` with license notices.
+
+### Download and first launch
+
+1. Open the repository's [Releases page](https://github.com/peters83-ins/ChessCoach/releases)
+   and expand the newest release's **Assets** list.
+2. Download `ChessCoach-v<version>-windows-x64-portable.zip` for the portable build,
+   or `ChessCoach-<version>-windows-x64-setup.exe` for the installer. Do not use the
+   **Source code** ZIP; it is the developer source tree and cannot launch the app.
+3. Optional but recommended: download `SHA256SUMS.txt`, open PowerShell in your
+   Downloads folder, and verify the artifact you downloaded:
+
+   ```powershell
+   Get-FileHash .\ChessCoach-v0.1.2-windows-x64-portable.zip -Algorithm SHA256
+   ```
+
+   Compare the printed hash with the matching line in `SHA256SUMS.txt`.
+4. For the portable build, right-click the ZIP, choose **Properties**, select
+   **Unblock** if shown, then extract it to a writable folder such as
+   `C:\Apps\ChessCoach`. Open that folder and run `ChessCoach.exe`.
+5. For the installer, right-click the downloaded file, choose **Properties**, and
+   select **Unblock** if shown. Run it, accept the installation directory, and use
+   the new Start Menu shortcut.
+6. Windows SmartScreen may show an uncommon-download prompt for this new project.
+   Verify the SHA-256 first. The current release is checksummed but may be unsigned;
+   the portable ZIP is a valid alternative if you do not want to run an installer.
 
 The repository also contains the reproducible [PyInstaller spec](packaging/chesscoach.spec),
 the [Inno Setup script](packaging/ChessCoach.iss), and the [Windows release workflow](.github/workflows/windows-build.yml).
@@ -81,15 +106,17 @@ If `.venv` does not exist, create it first with `py -3 -m venv .venv` using Pyth
 `python -m chesscoach.main` also launches the app.
 
 On first launch, a setup guide checks the saved-game folder, looks for Stockfish,
-and offers optional OpenAI configuration. The same fields remain available through
-**Settings**. The API key is masked and stored only in the ignored local `.env`.
+and offers optional OpenAI configuration. Stockfish is selected by browsing to the
+extracted executable; the current UI does not download it automatically. The same
+fields remain available through **Settings**. The API key is masked and stored only
+in the ignored local `.env`.
 Use **Diagnostics** to copy the app version, database path, engine details, AI
 readiness, and latest sanitized error.
 
 Install a compatible local Stockfish executable separately, outside the repository.
 In the app, choose **White or Black**, choose a difficulty, **Browse** to the
-executable, then **Start Match**. Selecting Black flips the board and Stockfish
-plays first. Alternatively, choose **Local two-player** without an engine.
+extracted executable, then **Start Match**. Selecting Black flips the board and
+Stockfish plays first. Alternatively, choose **Local two-player** without an engine.
 
 The “Stockfish executable” is the engine program (`stockfish.exe` on Windows),
 not a credential or a PGN file. The app automatically checks PATH and its per-user
@@ -360,7 +387,11 @@ Confirm an installation from a terminal before opening the app:
 printf 'uci\nquit\n' | "$HOME/.local/share/ChessCoach/engines/stockfish"
 ```
 
-The packaged Windows release pins Stockfish 19's official x64 universal archive and verifies its SHA-256 before extraction. Stockfish is GPL-licensed; the release includes attribution and the license link. See the [official Stockfish download page](https://stockfishchess.org/download/) and [Stockfish source license](https://github.com/official-stockfish/Stockfish/blob/master/COPYING).
+The Windows release workflow uses a pinned Stockfish 19 archive for its automated
+tests. End users should download Stockfish from the [official Stockfish download
+page](https://stockfishchess.org/download/), extract the archive, and select the
+`.exe` file in Chess Coach. Stockfish is GPL-licensed; the release includes
+attribution and the license link. See the [Stockfish source license](https://github.com/official-stockfish/Stockfish/blob/master/COPYING).
 
 Seeing an `id name Stockfish ...` response confirms the executable speaks UCI.
 Stockfish is authoritative for engine evaluations and moves; the optional language
