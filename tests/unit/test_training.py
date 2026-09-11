@@ -2,10 +2,40 @@ from dataclasses import replace
 
 import chess
 
-from chesscoach.coach.models import PracticeItem
+from chesscoach.coach.models import (
+    EngineScore,
+    Evidence,
+    GamePhase,
+    MoveAnalysis,
+    MoveClassification,
+    PracticeItem,
+)
 from chesscoach.coach.practice import generate_practice_items
 from chesscoach.coach.training import TrainingSession
-from tests.unit.test_coach_learning import mistake
+
+
+def mistake() -> MoveAnalysis:
+    """Build the analysis fixture used by this module without importing another test."""
+    return MoveAnalysis(
+        1,
+        chess.STARTING_FEN,
+        "white",
+        "f2f3",
+        "f3",
+        "e2e4",
+        "e4",
+        EngineScore(centipawns=50),
+        EngineScore(centipawns=-100),
+        12,
+        82,
+        MoveClassification.MISTAKE,
+        GamePhase.OPENING,
+        ("e2e4", "e7e5"),
+        ("f2f3", "e7e5"),
+        14,
+        (Evidence("fact", "opening_development", "Develop toward the center."),),
+        ("opening_development",),
+    )
 
 
 def item(**changes: object) -> PracticeItem:

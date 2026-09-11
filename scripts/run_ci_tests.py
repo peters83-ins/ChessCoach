@@ -7,8 +7,15 @@ shutdown, so CI exits with the recorded pytest status after flushing output.
 
 import os
 import sys
+from pathlib import Path
 
 import pytest
+
+# Running this file directly makes ``scripts`` Python's import root.  Keep the
+# repository root importable so pytest collection behaves like ``python -m pytest``.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 
 def main() -> None:
