@@ -8,10 +8,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   package:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -139,6 +143,8 @@ jobs:
         with:
           name: chesscoach-windows-${{ github.run_number }}
           path: dist/**
+          if-no-files-found: error
+          retention-days: 14
       - name: Explain manual build output
         if: "!startsWith(github.ref, 'refs/tags/')"
         shell: pwsh
